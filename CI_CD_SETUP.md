@@ -20,62 +20,134 @@ Go to: **GitHub Repo → Settings → Secrets and variables → Actions**
 
 Add these secrets:
 
+### Cloudflare Tunnel Authentication
+- `CF_SERVICE_CLIENT_ID` - Cloudflare Service Token Client ID
+- `CF_SERVICE_CLIENT_SECRET` - Cloudflare Service Token Client Secret  
+- `CF_TUNNEL_ID` - Your Cloudflare Tunnel ID
+- `CF_SSH_HOSTNAME` - SSH hostname through Cloudflare (e.g., `ssh.randy.it.com`)
+
+### Server Access
+- `SSH_USER` - SSH username on your workstation (e.g., `randy` or `ubuntu`)
+
 ### Database
 - `TEST_DATABASE_URL`
   ```
-  postgresql://randy:password@test-db-host:5432/aaip_data_test
+  postgresql://randy:password@100.77.247.113:5432/aaip_data_trend_dev_db
   ```
-
-### SSH Access (for deployment)
-- `TEST_SERVER_SSH_KEY` - Private SSH key for test server
-- `TEST_SERVER_HOST` - Test server IP/hostname (e.g., `100.77.247.113`)
-- `TEST_SERVER_USER` - SSH username (e.g., `ubuntu` or `deployer`)
 
 ### Deployment Paths
 - `TEST_DEPLOY_PATH` - Path on server where code is deployed
   ```
-  /home/ubuntu/aaip-data
+  /Users/jinzhiqiang/workspaces/doit/aaip-data
   ```
 
 ### Health Check URLs
 - `TEST_BACKEND_URL` - Backend health check URL
   ```
-  http://test-server.example.com:8000
+  http://localhost:8000
   ```
 - `TEST_FRONTEND_URL` - Frontend URL
   ```
-  http://test-server.example.com:3002
+  http://localhost:3002
   ```
 
-## Test Server Setup
+## Cloudflare Tunnel Setup
 
-### Prerequisites on Test Server:
+### Prerequisites on Your Workstation:
 
-1. **Git repository cloned:**
+This setup uses **Cloudflare Tunnel SSH** to securely connect GitHub Actions to your home workstation.
+
+1. **Cloudflare Tunnel already configured:**
+   - SSH accessible via: `ssh.randy.it.com`
+   - Tunnel ID: Available in Cloudflare dashboard
+
+2. **Create Service Token for GitHub Actions:**
 ```bash
-cd /home/ubuntu
-git clone https://github.com/YOUR_USERNAME/aaip-data.git
+# Login to Cloudflare
+cloudflared login
+
+# Create service token for SSH access
+# Go to Cloudflare Zero Trust Dashboard → Access → Service Auth
+# Create new Service Token with SSH access
+# Save Client ID and Secret for GitHub Secrets
+```
+
+3. **Git repository cloned on workstation:**
+```bash
+cd /Users/jinzhiqiang/workspaces/doit
+# Repository should already be here at: aaip-data
 cd aaip-data
 git checkout test
 ```
 
-2. **Python environment:**
+2. **Python environment (already done):**
 ```bash
-sudo apt update
-sudo apt install python3 python3-pip
-pip3 install -r scraper/requirements.txt
-pip3 install -r backend/requirements.txt
+# Should already be installed
+python3 --version
+pip3 --version
 ```
 
-3. **Node.js:**
+3. **Node.js (already done):**
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install -y nodejs
+# Should already be installed  
+node --version
+npm --version
 ```
 
-4. **Backend service (systemd):**
-Create `/etc/systemd/system/aaip-backend-test.service`:
+4. **Backend service (systemd) - macOS alternative:**
+
+For macOS, use LaunchAgent instead:
+
+Create `~/Library/LaunchAgents/com.aaip.backend-test.plist`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.aaip.backend-test</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>-m</string>
+        <string>uvicorn</string>
+        <string>main_enhanced:app</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>8000</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/jinzhiqiang/workspaces/doit/aaip-data/backend</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DATABASE_URL</key>
+        <string>postgresql://randy:1234QWER$@100.77.247.113:5432/aaip_data_trend_dev_db</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/aaip-backend-test.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/aaip-backend-test-error.log</string>
+</dict>
+</plist>
+```
+
+Load and start:
+```bash
+launchctl load ~/Library/LaunchAgents/com.aaip.backend-test.plist
+launchctl start com.aaip.backend-test
+
+# Check status
+launchctl list | grep aaip
+```
+
+For Linux, use systemd (original instructions):
 ```ini
+# /etc/systemd/system/aaip-backend-test.service
 [Unit]
 Description=AAIP Backend Test
 After=network.target
@@ -92,13 +164,54 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-Enable and start:
+5. **Frontend - For macOS (dev server or nginx):**
+
+**Option A: Use Vite dev server (for testing):**
 ```bash
-sudo systemctl enable aaip-backend-test
-sudo systemctl start aaip-backend-test
+cd /Users/jinzhiqiang/workspaces/doit/aaip-data/frontend
+npm run dev -- --host 0.0.0.0 --port 3002
 ```
 
-5. **Frontend web server (nginx):**
+**Option B: Use nginx (production-like):**
+```bash
+# Install nginx via Homebrew
+brew install nginx
+
+# Configure nginx
+sudo nano /usr/local/etc/nginx/nginx.conf
+```
+
+Add server block:
+```nginx
+server {
+    listen 3002;
+    server_name localhost;
+    
+    root /Users/jinzhiqiang/workspaces/doit/aaip-data/frontend/dist;
+    index index.html;
+    
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    
+    location /api {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Start nginx:
+```bash
+brew services start nginx
+# Or manually: nginx
+```
+
+**For Linux (original instructions):**
 ```bash
 sudo apt install nginx
 
@@ -139,17 +252,21 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-6. **SSH key for deployment:**
+6. **Cloudflare Tunnel Access (No SSH keys needed!):**
+
+The beauty of Cloudflare Tunnel is that GitHub Actions doesn't need SSH keys stored!
+
+Instead, it uses:
+- Service Token authentication
+- Short-lived certificates
+- Automatic SSH proxy through Cloudflare
+
+**Verify your tunnel is working:**
 ```bash
-# On your local machine
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/aaip_deploy
+# From anywhere with cloudflared installed
+cloudflared access ssh --hostname ssh.randy.it.com
 
-# Copy public key to test server
-ssh-copy-id -i ~/.ssh/aaip_deploy.pub ubuntu@test-server
-
-# Add private key to GitHub Secrets
-cat ~/.ssh/aaip_deploy
-# Copy output and add as TEST_SERVER_SSH_KEY secret
+# Should connect to your workstation
 ```
 
 ## Workflow Jobs

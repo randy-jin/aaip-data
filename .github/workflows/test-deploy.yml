@@ -66,7 +66,7 @@ jobs:
         cd frontend
         test -d dist && echo "Frontend build successful"
         
-  # Job 2: Deploy to Test Server
+  # Job 2: Deploy to Test Server via Cloudflare Tunnel
   deploy:
     name: Deploy to Test Server
     needs: test
@@ -77,74 +77,142 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.TEST_SERVER_SSH_KEY }}
-        
-    - name: Add server to known hosts
+    - name: 🛠️ Install cloudflared CLI
       run: |
+        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared.deb
+        
+    - name: 🔑 Get Short-Lived SSH Certificate
+      env:
+        CF_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        CF_TUNNEL: ${{ secrets.CF_TUNNEL_ID }}
+        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+      run: |
+        # Get SSH certificate from Cloudflare
+        cloudflared access ssh-gen --hostname ${SSH_HOST}
+        
+    - name: 🔧 Configure SSH for Cloudflare Tunnel
+      env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+      run: |
+        # Configure SSH to use Cloudflare Tunnel
         mkdir -p ~/.ssh
-        ssh-keyscan -H ${{ secrets.TEST_SERVER_HOST }} >> ~/.ssh/known_hosts
+        chmod 700 ~/.ssh
         
-    - name: Deploy Backend
+        cat >> ~/.ssh/config << EOF
+        Host ${SSH_HOST}
+            User ${SSH_USER}
+            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+        EOF
+        
+        chmod 600 ~/.ssh/config
+        
+    - name: 🚀 Deploy Backend via Cloudflare Tunnel
+      env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }} << 'EOF'
-          cd ${{ secrets.TEST_DEPLOY_PATH }}
+        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+          set -e
+          cd ${DEPLOY_PATH}
+          
+          echo "📥 Pulling latest code..."
           git fetch origin
           git checkout test
           git pull origin test
           
-          # Update backend
+          echo "🔧 Updating backend..."
           cd backend
-          pip3 install -r requirements.txt
+          pip3 install -r requirements.txt --quiet
           
-          # Restart backend service
-          sudo systemctl restart aaip-backend-test || echo "Manual restart required"
-        EOF
+          echo "♻️ Restarting backend service..."
+          sudo systemctl restart aaip-backend-test || echo "⚠️ Manual restart required"
+          
+          echo "✅ Backend deployment complete"
+        ENDSSH
         
-    - name: Deploy Frontend
+    - name: 🎨 Deploy Frontend via Cloudflare Tunnel
+      env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }} << 'EOF'
-          cd ${{ secrets.TEST_DEPLOY_PATH }}/frontend
-          npm ci
+        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+          set -e
+          cd ${DEPLOY_PATH}/frontend
+          
+          echo "📦 Installing frontend dependencies..."
+          npm ci --quiet
+          
+          echo "🏗️ Building frontend..."
           npm run build
           
-          # Copy to web server directory
-          sudo cp -r dist/* /var/www/aaip-test/ || echo "Manual copy required"
-        EOF
-        
-    - name: Deploy Scraper
-      run: |
-        ssh ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }} << 'EOF'
-          cd ${{ secrets.TEST_DEPLOY_PATH }}/scraper
-          pip3 install -r requirements.txt
+          echo "📤 Deploying to web server..."
+          sudo cp -r dist/* /var/www/aaip-test/ || echo "⚠️ Manual copy required"
           
-          # Update cron job if needed
-          crontab -l | grep -q "scraper_enhanced.py" || echo "Cron setup required"
-        EOF
+          echo "✅ Frontend deployment complete"
+        ENDSSH
         
-    - name: Health Check
+    - name: 🔄 Update Scraper via Cloudflare Tunnel
+      env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        echo "Waiting for services to start..."
-        sleep 10
+        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+          set -e
+          cd ${DEPLOY_PATH}/scraper
+          
+          echo "🔧 Updating scraper dependencies..."
+          pip3 install -r requirements.txt --quiet
+          
+          echo "✅ Scraper update complete"
+        ENDSSH
         
-        # Check backend health
-        curl -f ${{ secrets.TEST_BACKEND_URL }} || exit 1
+    - name: 💚 Health Check
+      env:
+        TEST_BACKEND_URL: ${{ secrets.TEST_BACKEND_URL }}
+        TEST_FRONTEND_URL: ${{ secrets.TEST_FRONTEND_URL }}
+      run: |
+        echo "⏳ Waiting for services to start..."
+        sleep 15
         
-        # Check frontend
-        curl -f ${{ secrets.TEST_FRONTEND_URL }} || exit 1
+        echo "🔍 Checking backend health..."
+        if curl -f -s ${TEST_BACKEND_URL} > /dev/null; then
+          echo "✅ Backend is healthy"
+        else
+          echo "❌ Backend health check failed"
+          exit 1
+        fi
         
-        echo "✓ Health checks passed"
+        echo "🔍 Checking frontend..."
+        if curl -f -s ${TEST_FRONTEND_URL} > /dev/null; then
+          echo "✅ Frontend is accessible"
+        else
+          echo "❌ Frontend health check failed"
+          exit 1
+        fi
         
-    - name: Notify deployment
+        echo "✨ All health checks passed!"
+        
+    - name: 📊 Deployment Summary
       if: success()
       run: |
-        echo "🚀 Deployment to test server successful!"
-        echo "Backend: ${{ secrets.TEST_BACKEND_URL }}"
-        echo "Frontend: ${{ secrets.TEST_FRONTEND_URL }}"
+        echo "🎉 Deployment to test server successful!"
+        echo ""
+        echo "📍 Endpoints:"
+        echo "   Backend: ${{ secrets.TEST_BACKEND_URL }}"
+        echo "   Frontend: ${{ secrets.TEST_FRONTEND_URL }}"
+        echo ""
+        echo "🕐 Deployed at: $(date -u)"
         
-    - name: Notify failure
+    - name: ❌ Deployment Failed
       if: failure()
       run: |
-        echo "❌ Deployment failed - check logs"
+        echo "💥 Deployment failed - check logs above"
+        echo "🔧 You may need to deploy manually"
