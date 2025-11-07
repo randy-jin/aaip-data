@@ -3,6 +3,8 @@
 ## Current Status
 ❌ **NOT RUNNING** - Manual collection only
 
+⚠️ **Important**: The scraper now includes **change detection** - it will only save data when something actually changes on the AAIP website. This keeps your database clean and meaningful!
+
 You need to choose and set up one of these options:
 
 ---
@@ -191,5 +193,29 @@ except Exception as e:
 Once set up, scraper will run:
 - Every hour at :00 minutes (00:00, 01:00, 02:00, etc.)
 - Collects data from all 8 streams
-- Updates PostgreSQL database
+- **Only saves when data changes** (smart detection)
 - Takes ~10 seconds per run
+- Logs all attempts (saved or skipped)
+
+## How Change Detection Works:
+
+The scraper compares current data with the last saved record:
+
+1. **Fetches data** from AAIP website
+2. **Compares** with last database record
+3. **If identical**: Logs "no_change" and skips save
+4. **If different**: Saves new data with timestamp
+
+### Example Logs:
+```
+2025-11-07 14:00:00 | success   | Data changed and saved      | 8
+2025-11-07 15:00:00 | no_change | Data unchanged, not saved   | 0
+2025-11-07 16:00:00 | no_change | Data unchanged, not saved   | 0
+2025-11-07 17:00:00 | success   | Data changed and saved      | 8
+```
+
+This means:
+- ✅ Your database only contains meaningful changes
+- ✅ Charts show actual trend changes, not noise
+- ✅ Storage space is optimized
+- ✅ You can see when AAIP actually updates their data
