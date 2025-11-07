@@ -63,8 +63,10 @@ uvicorn main:app --reload
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
 ```
+
+The dashboard will be available at `http://localhost:3002`
 
 ## Data Source
 

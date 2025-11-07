@@ -135,7 +135,7 @@ To start using the application:
    ```
 
 4. **Access Dashboard**
-   - Open http://localhost:3000
+   - Open http://localhost:3002
    - View real-time data and trends
 
 5. **Enable Automation**
