@@ -31,4 +31,25 @@ export const getScrapeLogs = async (limit = 50) => {
   return response.data;
 };
 
+// New stream-related endpoints
+export const getStreamList = async () => {
+  const response = await api.get('/api/streams/list');
+  return response.data;
+};
+
+export const getStreamData = async (streamName, limit = 100) => {
+  const response = await api.get(`/api/streams/${encodeURIComponent(streamName)}`, {
+    params: { limit }
+  });
+  return response.data;
+};
+
+export const getAllStreams = async (limit = 100, offset = 0, streamType = null) => {
+  const params = { limit, offset };
+  if (streamType) params.stream_type = streamType;
+  
+  const response = await api.get('/api/streams', { params });
+  return response.data;
+};
+
 export default api;
