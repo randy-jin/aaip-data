@@ -26,11 +26,14 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
         
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
         
     - name: Install Python dependencies
       run: |
@@ -77,10 +80,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: 💾 Cache cloudflared CLI
+      id: cache-cloudflared
+      uses: actions/cache@v3
+      with:
+        path: /usr/local/bin/cloudflared
+        key: cloudflared-${{ runner.os }}-latest
+        
     - name: 🛠️ Install cloudflared CLI
+      if: steps.cache-cloudflared.outputs.cache-hit != 'true'
       run: |
         curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
         sudo dpkg -i cloudflared.deb
+        rm cloudflared.deb
         
     - name: 🔑 Get Short-Lived SSH Certificate
       env:
