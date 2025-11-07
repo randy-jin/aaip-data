@@ -45,7 +45,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd frontend
-        npm ci --ignore-scripts
+        npm ci --ignore-scripts --ignore-scripts
         
     - name: Test scraper
       env:
