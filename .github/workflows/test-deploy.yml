@@ -1,0 +1,150 @@
+name: Test Branch CI/CD
+
+on:
+  push:
+    branches:
+      - test
+  pull_request:
+    branches:
+      - test
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # Job 1: Run Tests
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Install Python dependencies
+      run: |
+        cd scraper
+        pip install -r requirements.txt
+        cd ../backend
+        pip install -r requirements.txt
+        
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+        
+    - name: Test scraper
+      env:
+        DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      run: |
+        cd scraper
+        python3 -c "import scraper_enhanced; print('Scraper module loaded successfully')"
+        
+    - name: Test backend
+      run: |
+        cd backend
+        python3 -c "import main_enhanced; print('Backend module loaded successfully')"
+        
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+        
+    - name: Test frontend build
+      run: |
+        cd frontend
+        test -d dist && echo "Frontend build successful"
+        
+  # Job 2: Deploy to Test Server
+  deploy:
+    name: Deploy to Test Server
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.TEST_SERVER_SSH_KEY }}
+        
+    - name: Add server to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.TEST_SERVER_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Deploy Backend
+      run: |
+        ssh ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }} << 'EOF'
+          cd ${{ secrets.TEST_DEPLOY_PATH }}
+          git fetch origin
+          git checkout test
+          git pull origin test
+          
+          # Update backend
+          cd backend
+          pip3 install -r requirements.txt
+          
+          # Restart backend service
+          sudo systemctl restart aaip-backend-test || echo "Manual restart required"
+        EOF
+        
+    - name: Deploy Frontend
+      run: |
+        ssh ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }} << 'EOF'
+          cd ${{ secrets.TEST_DEPLOY_PATH }}/frontend
+          npm ci
+          npm run build
+          
+          # Copy to web server directory
+          sudo cp -r dist/* /var/www/aaip-test/ || echo "Manual copy required"
+        EOF
+        
+    - name: Deploy Scraper
+      run: |
+        ssh ${{ secrets.TEST_SERVER_USER }}@${{ secrets.TEST_SERVER_HOST }} << 'EOF'
+          cd ${{ secrets.TEST_DEPLOY_PATH }}/scraper
+          pip3 install -r requirements.txt
+          
+          # Update cron job if needed
+          crontab -l | grep -q "scraper_enhanced.py" || echo "Cron setup required"
+        EOF
+        
+    - name: Health Check
+      run: |
+        echo "Waiting for services to start..."
+        sleep 10
+        
+        # Check backend health
+        curl -f ${{ secrets.TEST_BACKEND_URL }} || exit 1
+        
+        # Check frontend
+        curl -f ${{ secrets.TEST_FRONTEND_URL }} || exit 1
+        
+        echo "✓ Health checks passed"
+        
+    - name: Notify deployment
+      if: success()
+      run: |
+        echo "🚀 Deployment to test server successful!"
+        echo "Backend: ${{ secrets.TEST_BACKEND_URL }}"
+        echo "Frontend: ${{ secrets.TEST_FRONTEND_URL }}"
+        
+    - name: Notify failure
+      if: failure()
+      run: |
+        echo "❌ Deployment failed - check logs"
