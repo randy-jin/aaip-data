@@ -253,9 +253,91 @@ def scrape_aaip_data():
         raise
 
 
-def save_to_database(data):
-    """Save scraped data to PostgreSQL database"""
+def check_data_changed(data):
+    """Check if data has changed compared to the last record"""
     try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check overall summary change
+        cursor.execute('''
+            SELECT nomination_allocation, nominations_issued, 
+                   nomination_spaces_remaining, applications_to_process
+            FROM aaip_summary
+            ORDER BY timestamp DESC
+            LIMIT 1
+        ''')
+        
+        last_summary = cursor.fetchone()
+        
+        if last_summary:
+            current = data['summary']
+            if (current['nomination_allocation'] == last_summary[0] and
+                current['nominations_issued'] == last_summary[1] and
+                current['nomination_spaces_remaining'] == last_summary[2] and
+                current['applications_to_process'] == last_summary[3]):
+                
+                # Check if all streams are also unchanged
+                all_unchanged = True
+                for stream in data['streams']:
+                    cursor.execute('''
+                        SELECT nomination_allocation, nominations_issued, 
+                               nomination_spaces_remaining, applications_to_process
+                        FROM stream_data
+                        WHERE stream_name = %s
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    ''', (stream['stream_name'],))
+                    
+                    last_stream = cursor.fetchone()
+                    if last_stream:
+                        if (stream['nomination_allocation'] != last_stream[0] or
+                            stream['nominations_issued'] != last_stream[1] or
+                            stream['nomination_spaces_remaining'] != last_stream[2] or
+                            stream['applications_to_process'] != last_stream[3]):
+                            all_unchanged = False
+                            break
+                    else:
+                        # New stream, definitely changed
+                        all_unchanged = False
+                        break
+                
+                cursor.close()
+                conn.close()
+                return not all_unchanged  # True if any change detected
+        
+        cursor.close()
+        conn.close()
+        return True  # First run or no previous data, save it
+        
+    except Exception as e:
+        print(f"Warning: Could not check previous data: {e}")
+        return True  # On error, save anyway
+
+
+def save_to_database(data):
+    """Save scraped data to PostgreSQL database (only if changed)"""
+    try:
+        # Check if data has changed
+        has_changed = check_data_changed(data)
+        
+        if not has_changed:
+            print("⊘ No changes detected - skipping save")
+            
+            # Log that we checked but didn't save
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO scrape_log (timestamp, status, message, streams_collected)
+                VALUES (%s, %s, %s, %s)
+            ''', (datetime.now(), 'no_change', 'Data unchanged, not saved', 0))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return
+        
+        print("✓ Changes detected - saving data...")
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -268,7 +350,6 @@ def save_to_database(data):
                 (timestamp, nomination_allocation, nominations_issued, 
                  nomination_spaces_remaining, applications_to_process, last_updated)
                 VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (timestamp) DO NOTHING
             ''', (
                 data['timestamp'],
                 data['summary']['nomination_allocation'],
@@ -287,7 +368,6 @@ def save_to_database(data):
                  nomination_spaces_remaining, applications_to_process,
                  processing_date, last_updated)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (timestamp, stream_name) DO NOTHING
             ''', (
                 data['timestamp'],
                 stream['stream_name'],
@@ -302,11 +382,11 @@ def save_to_database(data):
             ))
             streams_saved += 1
         
-        # Log successful scrape
+        # Log successful scrape with save
         cursor.execute('''
             INSERT INTO scrape_log (timestamp, status, message, streams_collected)
             VALUES (%s, %s, %s, %s)
-        ''', (datetime.now(), 'success', f'Data scraped successfully', streams_saved))
+        ''', (datetime.now(), 'success', f'Data changed and saved', streams_saved))
         
         conn.commit()
         cursor.close()
