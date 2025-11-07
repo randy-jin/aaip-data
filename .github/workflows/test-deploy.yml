@@ -107,14 +107,15 @@ jobs:
     - name: 🔧 Configure SSH for Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
         # Configure SSH to use Cloudflare Tunnel
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        cat >> ~/.ssh/config << EOF
-        Host ${SSH_HOST}
+        # Write SSH config with proper variable substitution
+        cat > ~/.ssh/config << EOF
+        Host ${CF_SSH_HOSTNAME}
             User ${SSH_USER}
             ProxyCommand cloudflared access ssh --hostname %h
             StrictHostKeyChecking no
@@ -123,15 +124,18 @@ jobs:
         
         chmod 600 ~/.ssh/config
         
+        echo "SSH config created:"
+        cat ~/.ssh/config
+        
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
           set -e
-          cd ${DEPLOY_PATH}
+          cd '${{ secrets.TEST_DEPLOY_PATH }}'
           
           echo "📥 Pulling latest code..."
           git fetch origin
@@ -151,12 +155,11 @@ jobs:
     - name: 🎨 Deploy Frontend via Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
-        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
           set -e
-          cd ${DEPLOY_PATH}/frontend
+          cd '${{ secrets.TEST_DEPLOY_PATH }}/frontend'
           
           echo "📦 Installing frontend dependencies..."
           npm ci --quiet
@@ -173,12 +176,11 @@ jobs:
     - name: 🔄 Update Scraper via Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
-        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
           set -e
-          cd ${DEPLOY_PATH}/scraper
+          cd '${{ secrets.TEST_DEPLOY_PATH }}/scraper'
           
           echo "🔧 Updating scraper dependencies..."
           pip3 install -r requirements.txt --quiet
