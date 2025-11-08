@@ -98,45 +98,49 @@ jobs:
       env:
         CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
         CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        # Set up Cloudflare service token for authentication
-        mkdir -p ~/.cloudflared
+        # Set Cloudflare service token environment variables
+        # These will be used by cloudflared automatically
+        export TUNNEL_SERVICE_TOKEN_ID="${CF_SERVICE_CLIENT_ID}"
+        export TUNNEL_SERVICE_TOKEN_SECRET="${CF_SERVICE_CLIENT_SECRET}"
         
-        # Create credentials file for service token
-        cat > ~/.cloudflared/cert.json << EOF
-        {
-          "AccountTag": "unused",
-          "TunnelSecret": "unused",
-          "TunnelID": "unused"
-        }
-        EOF
+        # Store in environment for subsequent steps
+        echo "TUNNEL_SERVICE_TOKEN_ID=${CF_SERVICE_CLIENT_ID}" >> $GITHUB_ENV
+        echo "TUNNEL_SERVICE_TOKEN_SECRET=${CF_SERVICE_CLIENT_SECRET}" >> $GITHUB_ENV
         
-        echo "Cloudflare authentication configured"
+        echo "Cloudflare service token configured"
+        
+        # Verify cloudflared is working
+        /usr/local/bin/cloudflared --version
         
     - name: 🔧 Configure SSH for Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
         CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
       run: |
         # Configure SSH to use Cloudflare Tunnel
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Write SSH config with Cloudflare Access
+        # For Cloudflare Tunnel, we need bastion/jump host style config
         cat > ~/.ssh/config << EOF
         Host ${CF_SSH_HOSTNAME}
             User ${SSH_USER}
-            ProxyCommand cloudflared access ssh --hostname %h --id ${CF_SERVICE_CLIENT_ID} --secret ${CF_SERVICE_CLIENT_SECRET}
+            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
+            IdentitiesOnly yes
         EOF
         
         chmod 600 ~/.ssh/config
         
         echo "SSH config created:"
         cat ~/.ssh/config
+        
+        # Test cloudflared connectivity
+        echo "Testing Cloudflare connection..."
+        /usr/local/bin/cloudflared access login ${CF_SSH_HOSTNAME} || echo "Login check skipped"
         
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
