@@ -151,11 +151,8 @@ jobs:
         ENDSSH
         
     - name: 🎨 Deploy Frontend via Cloudflare Tunnel
-      env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/frontend'
           
@@ -172,11 +169,8 @@ jobs:
         ENDSSH
         
     - name: 🔄 Update Scraper via Cloudflare Tunnel
-      env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/scraper'
           
