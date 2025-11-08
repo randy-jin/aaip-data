@@ -94,30 +94,41 @@ jobs:
         sudo dpkg -i cloudflared.deb
         rm cloudflared.deb
         
-    - name: 🔑 Get Short-Lived SSH Certificate
+    - name: 🔑 Authenticate with Cloudflare Tunnel
       env:
-        CF_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
-        CF_TUNNEL: ${{ secrets.CF_TUNNEL_ID }}
-        SSH_HOST: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
       run: |
-        # Get SSH certificate from Cloudflare
-        cloudflared access ssh-gen --hostname ${SSH_HOST}
+        # Set up Cloudflare service token for authentication
+        mkdir -p ~/.cloudflared
+        
+        # Create credentials file for service token
+        cat > ~/.cloudflared/cert.json << EOF
+        {
+          "AccountTag": "unused",
+          "TunnelSecret": "unused",
+          "TunnelID": "unused"
+        }
+        EOF
+        
+        echo "Cloudflare authentication configured"
         
     - name: 🔧 Configure SSH for Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
         CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
       run: |
         # Configure SSH to use Cloudflare Tunnel
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Write SSH config with proper variable substitution
+        # Write SSH config with Cloudflare Access
         cat > ~/.ssh/config << EOF
         Host ${CF_SSH_HOSTNAME}
             User ${SSH_USER}
-            ProxyCommand cloudflared access ssh --hostname %h
+            ProxyCommand cloudflared access ssh --hostname %h --id ${CF_SERVICE_CLIENT_ID} --secret ${CF_SERVICE_CLIENT_SECRET}
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
         EOF
