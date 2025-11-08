@@ -96,38 +96,27 @@ jobs:
         
     - name: 🔑 Authenticate with Cloudflare Tunnel
       env:
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
       run: |
-        # Set Cloudflare service token environment variables
-        # These will be used by cloudflared automatically
-        export TUNNEL_SERVICE_TOKEN_ID="${CF_SERVICE_CLIENT_ID}"
-        export TUNNEL_SERVICE_TOKEN_SECRET="${CF_SERVICE_CLIENT_SECRET}"
-        
-        # Store in environment for subsequent steps
-        echo "TUNNEL_SERVICE_TOKEN_ID=${CF_SERVICE_CLIENT_ID}" >> $GITHUB_ENV
-        echo "TUNNEL_SERVICE_TOKEN_SECRET=${CF_SERVICE_CLIENT_SECRET}" >> $GITHUB_ENV
-        
-        echo "Cloudflare service token configured"
-        
         # Verify cloudflared is working
         /usr/local/bin/cloudflared --version
+        
+        echo "Using Cloudflare Tunnel ID: ${CF_TUNNEL_ID}"
         
     - name: 🔧 Configure SSH for Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
       run: |
-        # Configure SSH to use Cloudflare Tunnel
+        # Configure SSH to use Cloudflare Tunnel with Tunnel ID
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # For Cloudflare Tunnel, we need bastion/jump host style config
+        # Use tunnel ID directly - no DNS resolution needed
         cat > ~/.ssh/config << EOF
-        Host ${CF_SSH_HOSTNAME}
+        Host cf-tunnel
             User ${SSH_USER}
-            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname localhost --id ${CF_TUNNEL_ID}
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
             IdentitiesOnly yes
@@ -138,17 +127,11 @@ jobs:
         echo "SSH config created:"
         cat ~/.ssh/config
         
-        # Test cloudflared connectivity
-        echo "Testing Cloudflare connection..."
-        /usr/local/bin/cloudflared access login ${CF_SSH_HOSTNAME} || echo "Login check skipped"
-        
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}'
           
