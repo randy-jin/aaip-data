@@ -116,19 +116,20 @@ jobs:
     - name: 🔧 Configure SSH for Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
         CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
         CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
       run: |
-        # Configure SSH to use Cloudflare Tunnel
+        # Configure SSH to use Cloudflare Tunnel directly
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Write SSH config with Cloudflare Access
-        cat > ~/.ssh/config << EOF
-        Host ${CF_SSH_HOSTNAME}
-            User ${SSH_USER}
-            ProxyCommand cloudflared access ssh --hostname %h --id ${CF_SERVICE_CLIENT_ID} --secret ${CF_SERVICE_CLIENT_SECRET}
+        # Create SSH config using tunnel ID (not hostname)
+        cat > ~/.ssh/config << 'EOF'
+        Host cf-tunnel
+            HostName localhost
+            User ${{ secrets.SSH_USER }}
+            ProxyCommand cloudflared access ssh --hostname ${{ secrets.CF_TUNNEL_ID }}
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
         EOF
@@ -140,11 +141,9 @@ jobs:
         
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}'
           
@@ -164,11 +163,8 @@ jobs:
         ENDSSH
         
     - name: 🎨 Deploy Frontend via Cloudflare Tunnel
-      env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/frontend'
           
@@ -185,11 +181,8 @@ jobs:
         ENDSSH
         
     - name: 🔄 Update Scraper via Cloudflare Tunnel
-      env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        ssh ${SSH_USER}@${CF_SSH_HOSTNAME} << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/scraper'
           
