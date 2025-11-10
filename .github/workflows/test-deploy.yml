@@ -102,71 +102,75 @@ jobs:
         echo "🎯 Using cached cloudflared CLI"
         cloudflared --version
         
-    - name: 🔑 Setup Cloudflare Tunnel Credentials
-      env:
-        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
-        CF_TUNNEL_CREDENTIALS: ${{ secrets.CF_TUNNEL_CREDENTIALS }}
-      run: |
-        mkdir -p ~/.cloudflared
-        
-        # If you have tunnel credentials JSON, save it
-        if [ -n "$CF_TUNNEL_CREDENTIALS" ]; then
-          echo "$CF_TUNNEL_CREDENTIALS" > ~/.cloudflared/${CF_TUNNEL_ID}.json
-          echo "✅ Tunnel credentials configured"
-        else
-          echo "⚠️ No tunnel credentials - will use service token"
-        fi
-        
-    - name: 🔧 Configure SSH for Cloudflare Tunnel  
-      env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
-      run: |
-        # Configure SSH to connect through Cloudflare Tunnel
-        # Using bastion mode - tunnel must have SSH ingress configured
-        mkdir -p ~/.ssh
-        chmod 700 ~/.ssh
-        
-        # Create SSH config for cloudflared tunnel
-        cat > ~/.ssh/config << EOF
-        Host cf-tunnel
-            ProxyCommand cloudflared access ssh --hostname ${CF_TUNNEL_ID}.cfargotunnel.com
-            User ${SSH_USER}
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-        EOF
-        
-        chmod 600 ~/.ssh/config
-        
-        echo "✅ SSH config created"
-        cat ~/.ssh/config
+    # ** 移除原来的 '🔑 Setup Cloudflare Tunnel Credentials' 步骤 **
+    # ** 移除原来的 '🔧 Configure SSH for Cloudflare Tunnel' 步骤 **
         
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }} # ssh.randy.it.com
+        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh cf-tunnel << 'ENDSSH'
+        echo "--- Preparing Service Token for cloudflared ---"
+        # 创建 Service Token JSON 文件，用于 cloudflared access ssh 认证
+        TOKEN_FILE="/tmp/cf_service_token.json"
+        cat > ${TOKEN_FILE} << EOF
+        {
+          "Client ID": "${{ secrets.CF_SERVICE_CLIENT_ID }}",
+          "Client Secret": "${{ secrets.CF_SERVICE_CLIENT_SECRET }}"
+        }
+        EOF
+        
+        echo "--- Starting Backend Deployment via cloudflared access ssh ---"
+        # 使用 cloudflared access ssh 连接，并传递 Service Token
+        /usr/local/bin/cloudflared access ssh \
+          --hostname ${CF_SSH_HOSTNAME} \
+          --identity-file ${TOKEN_FILE} \
+          -- ${SSH_USER} << 'ENDSSH'
+          
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}'
-          
+
           echo "📥 Pulling latest code..."
           git fetch origin
           git checkout test
           git pull origin test
-          
+
           echo "🔧 Updating backend..."
           cd backend
           pip3 install -r requirements.txt --quiet
-          
+
           echo "♻️ Restarting backend service..."
           sudo systemctl restart aaip-backend-test || echo "⚠️ Manual restart required"
-          
+
           echo "✅ Backend deployment complete"
         ENDSSH
         
+        rm ${TOKEN_FILE}
+        
     - name: 🎨 Deploy Frontend via Cloudflare Tunnel
+      env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh cf-tunnel << 'ENDSSH'
+        TOKEN_FILE="/tmp/cf_service_token.json"
+        cat > ${TOKEN_FILE} << EOF
+        {
+          "Client ID": "${{ secrets.CF_SERVICE_CLIENT_ID }}",
+          "Client Secret": "${{ secrets.CF_SERVICE_CLIENT_SECRET }}"
+        }
+        EOF
+
+        /usr/local/bin/cloudflared access ssh \
+          --hostname ${CF_SSH_HOSTNAME} \
+          --identity-file ${TOKEN_FILE} \
+          -- ${SSH_USER} << 'ENDSSH'
+          
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/frontend'
           
@@ -177,14 +181,35 @@ jobs:
           npm run build
           
           echo "📤 Deploying to web server..."
+          # 使用 DEPLOY_PATH 变量确保路径正确
           sudo cp -r dist/* /var/www/aaip-test/ || echo "⚠️ Manual copy required"
           
           echo "✅ Frontend deployment complete"
         ENDSSH
         
+        rm ${TOKEN_FILE}
+        
     - name: 🔄 Update Scraper via Cloudflare Tunnel
+      env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh cf-tunnel << 'ENDSSH'
+        TOKEN_FILE="/tmp/cf_service_token.json"
+        cat > ${TOKEN_FILE} << EOF
+        {
+          "Client ID": "${{ secrets.CF_SERVICE_CLIENT_ID }}",
+          "Client Secret": "${{ secrets.CF_SERVICE_CLIENT_SECRET }}"
+        }
+        EOF
+
+        /usr/local/bin/cloudflared access ssh \
+          --hostname ${CF_SSH_HOSTNAME} \
+          --identity-file ${TOKEN_FILE} \
+          -- ${SSH_USER} << 'ENDSSH'
+          
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/scraper'
           
@@ -193,6 +218,8 @@ jobs:
           
           echo "✅ Scraper update complete"
         ENDSSH
+        
+        rm ${TOKEN_FILE}
         
     - name: 💚 Health Check
       env:
@@ -203,6 +230,7 @@ jobs:
         sleep 15
         
         echo "🔍 Checking backend health..."
+        # ... (Health Check 逻辑不变)
         if curl -f -s ${TEST_BACKEND_URL} > /dev/null; then
           echo "✅ Backend is healthy"
         else
