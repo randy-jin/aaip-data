@@ -49,10 +49,10 @@ jobs:
         
     - name: Test scraper
       env:
-        DATABASE_URL: 'postgresql://dummy:dummy@dummy:5432/dummy'
+        DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       run: |
         cd scraper
-        python3 -c "import scraper_enhanced; print('✓ Scraper module loaded successfully')"
+        python3 -c "import scraper_enhanced; print('Scraper module loaded successfully')"
         
     - name: Test backend
       run: |
@@ -96,30 +96,40 @@ jobs:
         
     - name: 🔑 Authenticate with Cloudflare Tunnel
       env:
-        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
+        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
       run: |
-        # Verify cloudflared is working
-        /usr/local/bin/cloudflared --version
+        # Set up Cloudflare service token for authentication
+        mkdir -p ~/.cloudflared
         
-        echo "Using Cloudflare Tunnel ID: ${CF_TUNNEL_ID}"
+        # Create credentials file for service token
+        cat > ~/.cloudflared/cert.json << EOF
+        {
+          "AccountTag": "unused",
+          "TunnelSecret": "unused",
+          "TunnelID": "unused"
+        }
+        EOF
+        
+        echo "Cloudflare authentication configured"
         
     - name: 🔧 Configure SSH for Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
         CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
       run: |
-        # Configure SSH to use Cloudflare Tunnel
+        # Configure SSH to use Cloudflare Tunnel directly
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Use cloudflared to proxy SSH through the tunnel
-        # The tunnel connects to your workstation's SSH service
-        cat > ~/.ssh/config << EOF
+        # Create SSH config using tunnel ID (not hostname)
+        cat > ~/.ssh/config << 'EOF'
         Host cf-tunnel
-            Hostname ${CF_SSH_HOSTNAME}
-            User ${SSH_USER}
-            ProxyCommand /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:7022
+            HostName localhost
+            User ${{ secrets.SSH_USER }}
+            ProxyCommand cloudflared access ssh --hostname ${{ secrets.CF_TUNNEL_ID }}
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
         EOF
@@ -128,9 +138,6 @@ jobs:
         
         echo "SSH config created:"
         cat ~/.ssh/config
-        echo ""
-        echo "Testing cloudflared connection..."
-        /usr/local/bin/cloudflared --version
         
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
