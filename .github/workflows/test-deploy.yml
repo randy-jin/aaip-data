@@ -93,7 +93,6 @@ jobs:
         echo "📥 Downloading cloudflared (cache miss)..."
         curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
         sudo dpkg -i cloudflared.deb
-        sudo cp /usr/bin/cloudflared /usr/local/bin/cloudflared 2>/dev/null || true
         rm cloudflared.deb
         echo "✅ cloudflared installed"
         
@@ -101,7 +100,6 @@ jobs:
       if: steps.cache-cloudflared.outputs.cache-hit == 'true'
       run: |
         echo "🎯 Using cached cloudflared CLI"
-        sudo cp /usr/local/bin/cloudflared /usr/bin/cloudflared || true
         cloudflared --version
         
     - name: 🔑 Setup Cloudflare Tunnel Credentials
@@ -123,27 +121,25 @@ jobs:
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
         CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
       run: |
-        # Configure SSH to use Cloudflare Tunnel directly via tunnel ID
+        # Configure SSH to connect through Cloudflare Tunnel
+        # Using bastion mode - tunnel must have SSH ingress configured
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Use tunnel UUID for direct connection (no DNS lookup needed!)
+        # Create SSH config for cloudflared tunnel
         cat > ~/.ssh/config << EOF
         Host cf-tunnel
-            HostName ${CF_TUNNEL_ID}.cfargotunnel.com
+            ProxyCommand cloudflared access ssh --hostname ${CF_TUNNEL_ID}.cfargotunnel.com
             User ${SSH_USER}
-            ProxyCommand cloudflared access ssh --hostname ${CF_TUNNEL_ID}.cfargotunnel.com --id ${CF_SERVICE_CLIENT_ID} --secret ${CF_SERVICE_CLIENT_SECRET}
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
-            IdentitiesOnly yes
         EOF
         
         chmod 600 ~/.ssh/config
         
-        echo "✅ SSH config created for tunnel ID: ${CF_TUNNEL_ID}"
+        echo "✅ SSH config created"
+        cat ~/.ssh/config
         
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:

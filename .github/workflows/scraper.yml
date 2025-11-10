@@ -29,14 +29,14 @@ jobs:
         DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
       run: |
         cd scraper
-        # Verify DATABASE_URL is set
-        if [ -z "$DATABASE_URL" ]; then
-          echo "❌ ERROR: DATABASE_URL secret not set!"
-          echo "Please set PROD_DATABASE_URL in GitHub Secrets"
-          exit 1
-        fi
-        echo "✅ Database URL configured"
-        python3 scraper_enhanced.py
+        # Only test that the scraper module loads correctly
+        # Don't actually scrape - that requires database connection
+        # Actual scraping should run on your workstation where DB is accessible
+        echo "✅ Testing scraper module import..."
+        python3 -c "import scraper_enhanced; print('✅ Scraper module loaded successfully')"
+        echo ""
+        echo "⚠️  Note: Actual scraping runs on your workstation via cron/systemd"
+        echo "   This CI job only validates the code can load properly"
         
     - name: Log completion
       if: always()
