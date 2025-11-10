@@ -90,53 +90,58 @@ jobs:
     - name: 🛠️ Install cloudflared CLI
       if: steps.cache-cloudflared.outputs.cache-hit != 'true'
       run: |
+        echo "📥 Downloading cloudflared (cache miss)..."
         curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
         sudo dpkg -i cloudflared.deb
+        sudo cp /usr/bin/cloudflared /usr/local/bin/cloudflared
         rm cloudflared.deb
+        echo "✅ cloudflared installed"
         
-    - name: 🔑 Authenticate with Cloudflare Tunnel
-      env:
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+    - name: ✅ Using cached cloudflared
+      if: steps.cache-cloudflared.outputs.cache-hit == 'true'
       run: |
-        # Set up Cloudflare service token for authentication
+        echo "🎯 Using cached cloudflared CLI"
+        sudo cp /usr/local/bin/cloudflared /usr/bin/cloudflared || true
+        cloudflared --version
+        
+    - name: 🔑 Setup Cloudflare Tunnel Credentials
+      env:
+        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
+        CF_TUNNEL_CREDENTIALS: ${{ secrets.CF_TUNNEL_CREDENTIALS }}
+      run: |
         mkdir -p ~/.cloudflared
         
-        # Create credentials file for service token
-        cat > ~/.cloudflared/cert.json << EOF
-        {
-          "AccountTag": "unused",
-          "TunnelSecret": "unused",
-          "TunnelID": "unused"
-        }
-        EOF
+        # If you have tunnel credentials JSON, save it
+        if [ -n "$CF_TUNNEL_CREDENTIALS" ]; then
+          echo "$CF_TUNNEL_CREDENTIALS" > ~/.cloudflared/${CF_TUNNEL_ID}.json
+          echo "✅ Tunnel credentials configured"
+        else
+          echo "⚠️ No tunnel credentials - will use service token"
+        fi
         
-        echo "Cloudflare authentication configured"
-        
-    - name: 🔧 Configure SSH for Cloudflare Tunnel
+    - name: 🔧 Configure SSH for Cloudflare Tunnel  
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        CF_SSH_HOST: ${{ secrets.CF_SSH_HOST }}
       run: |
         # Configure SSH to use Cloudflare Tunnel directly
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Create SSH config using tunnel ID (not hostname)
-        cat > ~/.ssh/config << 'EOF'
+        # Create SSH config - use the ingress hostname from your config
+        cat > ~/.ssh/config << EOF
         Host cf-tunnel
-            HostName localhost
-            User ${{ secrets.SSH_USER }}
-            ProxyCommand cloudflared access ssh --hostname ${{ secrets.CF_TUNNEL_ID }}
+            HostName ${CF_SSH_HOST}
+            User ${SSH_USER}
+            ProxyCommand cloudflared access ssh --hostname %h
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
+            IdentitiesOnly yes
         EOF
         
         chmod 600 ~/.ssh/config
         
-        echo "SSH config created:"
+        echo "✅ SSH config created:"
         cat ~/.ssh/config
         
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
