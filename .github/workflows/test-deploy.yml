@@ -48,16 +48,11 @@ jobs:
         npm ci --ignore-scripts --ignore-scripts
         
     - name: Test scraper
+      env:
+        DATABASE_URL: 'postgresql://dummy:dummy@dummy:5432/dummy'
       run: |
         cd scraper
-        python3 -c "
-import sys
-# Don't try to connect to database during import test
-import os
-os.environ['DATABASE_URL'] = 'postgresql://dummy:dummy@dummy:5432/dummy'
-import scraper_enhanced
-print('✓ Scraper module loaded successfully')
-"
+        python3 -c "import scraper_enhanced; print('✓ Scraper module loaded successfully')"
         
     - name: Test backend
       run: |
