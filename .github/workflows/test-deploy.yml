@@ -48,11 +48,16 @@ jobs:
         npm ci --ignore-scripts --ignore-scripts
         
     - name: Test scraper
-      env:
-        DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       run: |
         cd scraper
-        python3 -c "import scraper_enhanced; print('Scraper module loaded successfully')"
+        python3 -c "
+import sys
+# Don't try to connect to database during import test
+import os
+os.environ['DATABASE_URL'] = 'postgresql://dummy:dummy@dummy:5432/dummy'
+import scraper_enhanced
+print('✓ Scraper module loaded successfully')
+"
         
     - name: Test backend
       run: |
@@ -107,25 +112,30 @@ jobs:
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
         CF_TUNNEL_ID: ${{ secrets.CF_TUNNEL_ID }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
       run: |
-        # Configure SSH to use Cloudflare Tunnel with Tunnel ID
+        # Configure SSH to use Cloudflare Tunnel
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Use tunnel ID directly - no DNS resolution needed
+        # Use cloudflared to proxy SSH through the tunnel
+        # The tunnel connects to your workstation's SSH service
         cat > ~/.ssh/config << EOF
         Host cf-tunnel
+            Hostname ${CF_SSH_HOSTNAME}
             User ${SSH_USER}
-            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname localhost --id ${CF_TUNNEL_ID}
+            ProxyCommand /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:7022
             StrictHostKeyChecking no
             UserKnownHostsFile=/dev/null
-            IdentitiesOnly yes
         EOF
         
         chmod 600 ~/.ssh/config
         
         echo "SSH config created:"
         cat ~/.ssh/config
+        echo ""
+        echo "Testing cloudflared connection..."
+        /usr/local/bin/cloudflared --version
         
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
