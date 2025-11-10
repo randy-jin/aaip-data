@@ -29,6 +29,13 @@ jobs:
         DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
       run: |
         cd scraper
+        # Verify DATABASE_URL is set
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ ERROR: DATABASE_URL secret not set!"
+          echo "Please set PROD_DATABASE_URL in GitHub Secrets"
+          exit 1
+        fi
+        echo "✅ Database URL configured"
         python3 scraper_enhanced.py
         
     - name: Log completion
