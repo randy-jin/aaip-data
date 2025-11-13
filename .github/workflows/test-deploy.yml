@@ -80,56 +80,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: 💾 Cache cloudflared CLI
-      id: cache-cloudflared
-      uses: actions/cache@v3
-      with:
-        path: /usr/local/bin/cloudflared
-        key: cloudflared-${{ runner.os }}-latest
-        
-    - name: 🛠️ Install cloudflared CLI
-      if: steps.cache-cloudflared.outputs.cache-hit != 'true'
+    - name: 🔑 Setup SSH Key
       run: |
-        echo "📥 Downloading cloudflared (cache miss)..."
-        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-        sudo dpkg -i cloudflared.deb
-        rm cloudflared.deb
-        echo "✅ cloudflared installed"
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
         
-    - name: ✅ Using cached cloudflared
-      if: steps.cache-cloudflared.outputs.cache-hit == 'true'
-      run: |
-        echo "🎯 Using cached cloudflared CLI"
-        cloudflared --version
-        
-    # ** 移除原来的 '🔑 Setup Cloudflare Tunnel Credentials' 步骤 **
-    # ** 移除原来的 '🔧 Configure SSH for Cloudflare Tunnel' 步骤 **
-        
-    - name: 🚀 Deploy Backend via Cloudflare Tunnel
+    - name: 🚀 Deploy Backend via SSH
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }} # ssh.randy.it.com
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        SSH_HOST: ${{ secrets.SSH_HOST }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        echo "--- Preparing Service Token for cloudflared ---"
-        # 创建 Service Token JSON 文件，用于 cloudflared access ssh 认证
-        TOKEN_FILE="/tmp/cf_service_token.json"
-        cat > ${TOKEN_FILE} << EOF
-        {
-          "Client ID": "${{ secrets.CF_SERVICE_CLIENT_ID }}",
-          "Client Secret": "${{ secrets.CF_SERVICE_CLIENT_SECRET }}"
-        }
-        EOF
-        
-        echo "--- Starting Backend Deployment via cloudflared access ssh ---"
-        # 使用 cloudflared access ssh 连接，并传递 Service Token
-        /usr/local/bin/cloudflared access ssh \
-          --hostname ${CF_SSH_HOSTNAME} \
-          --identity-file ${TOKEN_FILE} \
-          -- ${SSH_USER} << 'ENDSSH'
-          
+        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}'
 
@@ -148,29 +112,13 @@ jobs:
           echo "✅ Backend deployment complete"
         ENDSSH
         
-        rm ${TOKEN_FILE}
-        
-    - name: 🎨 Deploy Frontend via Cloudflare Tunnel
+    - name: 🎨 Deploy Frontend via SSH
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        SSH_HOST: ${{ secrets.SSH_HOST }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        TOKEN_FILE="/tmp/cf_service_token.json"
-        cat > ${TOKEN_FILE} << EOF
-        {
-          "Client ID": "${{ secrets.CF_SERVICE_CLIENT_ID }}",
-          "Client Secret": "${{ secrets.CF_SERVICE_CLIENT_SECRET }}"
-        }
-        EOF
-
-        /usr/local/bin/cloudflared access ssh \
-          --hostname ${CF_SSH_HOSTNAME} \
-          --identity-file ${TOKEN_FILE} \
-          -- ${SSH_USER} << 'ENDSSH'
-          
+        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/frontend'
           
@@ -181,35 +129,18 @@ jobs:
           npm run build
           
           echo "📤 Deploying to web server..."
-          # 使用 DEPLOY_PATH 变量确保路径正确
           sudo cp -r dist/* /var/www/aaip-test/ || echo "⚠️ Manual copy required"
           
           echo "✅ Frontend deployment complete"
         ENDSSH
         
-        rm ${TOKEN_FILE}
-        
-    - name: 🔄 Update Scraper via Cloudflare Tunnel
+    - name: 🔄 Update Scraper via SSH
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
-        CF_SERVICE_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_SERVICE_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        SSH_HOST: ${{ secrets.SSH_HOST }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        TOKEN_FILE="/tmp/cf_service_token.json"
-        cat > ${TOKEN_FILE} << EOF
-        {
-          "Client ID": "${{ secrets.CF_SERVICE_CLIENT_ID }}",
-          "Client Secret": "${{ secrets.CF_SERVICE_CLIENT_SECRET }}"
-        }
-        EOF
-
-        /usr/local/bin/cloudflared access ssh \
-          --hostname ${CF_SSH_HOSTNAME} \
-          --identity-file ${TOKEN_FILE} \
-          -- ${SSH_USER} << 'ENDSSH'
-          
+        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
           set -e
           cd '${{ secrets.TEST_DEPLOY_PATH }}/scraper'
           
@@ -219,34 +150,35 @@ jobs:
           echo "✅ Scraper update complete"
         ENDSSH
         
-        rm ${TOKEN_FILE}
-        
     - name: 💚 Health Check
       env:
+        SSH_USER: ${{ secrets.SSH_USER }}
+        SSH_HOST: ${{ secrets.SSH_HOST }}
         TEST_BACKEND_URL: ${{ secrets.TEST_BACKEND_URL }}
         TEST_FRONTEND_URL: ${{ secrets.TEST_FRONTEND_URL }}
       run: |
-        echo "⏳ Waiting for services to start..."
-        sleep 15
-        
-        echo "🔍 Checking backend health..."
-        # ... (Health Check 逻辑不变)
-        if curl -f -s ${TEST_BACKEND_URL} > /dev/null; then
-          echo "✅ Backend is healthy"
-        else
-          echo "❌ Backend health check failed"
-          exit 1
-        fi
-        
-        echo "🔍 Checking frontend..."
-        if curl -f -s ${TEST_FRONTEND_URL} > /dev/null; then
-          echo "✅ Frontend is accessible"
-        else
-          echo "❌ Frontend health check failed"
-          exit 1
-        fi
-        
-        echo "✨ All health checks passed!"
+        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+          echo "⏳ Waiting for services to start..."
+          sleep 15
+          
+          echo "🔍 Checking backend health..."
+          if curl -f -s http://localhost:8000 > /dev/null; then
+            echo "✅ Backend is healthy"
+          else
+            echo "❌ Backend health check failed"
+            exit 1
+          fi
+          
+          echo "🔍 Checking frontend..."
+          if curl -f -s http://localhost:3002 > /dev/null; then
+            echo "✅ Frontend is accessible"
+          else
+            echo "❌ Frontend health check failed"
+            exit 1
+          fi
+          
+          echo "✨ All health checks passed!"
+        ENDSSH
         
     - name: 📊 Deployment Summary
       if: success()
