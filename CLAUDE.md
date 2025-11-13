@@ -126,6 +126,18 @@ GitHub Actions workflow (`.github/workflows/test-deploy.yml`) handles:
 **Branch**: `test` (deployment target)
 **Main branch**: Not specified (PRs typically target main)
 
+### Deployment Requirements
+
+**Server Configuration**:
+- Cloudflare Tunnel running (`ssh.randy.it.com`)
+- SSH key authentication configured for deploy user
+- Sudo permissions for service restart (configured in `/etc/sudoers.d/aaip-deploy`):
+  ```
+  randy ALL=(ALL) NOPASSWD: /bin/systemctl restart aaip-backend-test
+  randy ALL=(ALL) NOPASSWD: /bin/systemctl status aaip-backend-test
+  randy ALL=(ALL) NOPASSWD: /bin/cp -r * /var/www/aaip-test/*
+  ```
+
 ## Key Technical Details
 
 ### Scraper Behavior
