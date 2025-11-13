@@ -96,8 +96,9 @@ jobs:
 
     - name: 🚀 Deploy via Cloudflare Tunnel
       env:
-        CF_ACCESS_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
-        CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        # 临时注释掉 Access tokens 测试基本连接
+        # CF_ACCESS_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        # CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
         SSH_USER: ${{ secrets.SSH_USER }}
         CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
