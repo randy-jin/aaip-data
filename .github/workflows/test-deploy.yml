@@ -141,7 +141,8 @@ jobs:
             echo "⚠️ Deploy path does not exist, creating..."
             mkdir -p /home/randy/deploy
             cd /home/randy/deploy
-            git clone https://github.com/${{ github.repository }}.git aaip-data
+            # Clone with specific branch
+            git clone -b test https://github.com/${{ github.repository }}.git aaip-data
           fi
 
           cd /home/randy/deploy/aaip-data
@@ -152,10 +153,10 @@ jobs:
             exit 1
           fi
 
-          echo "📥 Pulling latest code..."
-          git fetch origin
+          echo "📥 Pulling latest code from test branch..."
+          git fetch origin test
           git checkout test
-          git pull origin test
+          git reset --hard origin/test
 
           echo "🔧 Updating backend..."
           cd backend
