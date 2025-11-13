@@ -96,10 +96,11 @@ jobs:
         rm cloudflared.deb
         echo "✅ cloudflared installed"
 
-    - name: ✅ Using cached cloudflared
+    - name: ✅ Setup cached cloudflared
       if: steps.cache-cloudflared.outputs.cache-hit == 'true'
       run: |
         echo "🎯 Using cached cloudflared CLI"
+        sudo chmod +x /usr/local/bin/cloudflared
         cloudflared --version
 
     - name: 🔑 Setup SSH Key
