@@ -82,22 +82,41 @@ print_step "步骤 3/5: 检查数据库连接"
 source venv/bin/activate
 
 # 尝试连接数据库
-if python3 -c "import psycopg2; import os; conn = psycopg2.connect(os.getenv('DATABASE_URL', 'postgresql://localhost/aaip_data_trend_dev_db')); conn.close(); print('✅ 数据库连接成功')" 2>/dev/null; then
+if python3 -c "import psycopg2; import os; conn = psycopg2.connect(os.getenv('DATABASE_URL', 'postgresql://randy@localhost/aaip_data_trend_dev_db')); conn.close(); print('✅ 数据库连接成功')" 2>/dev/null; then
     print_success "数据库连接正常"
 else
     print_error "数据库连接失败"
     echo ""
-    print_info "请先配置数据库："
-    echo "  ./deployment/configure-database.sh"
-    echo ""
-    print_info "或手动配置："
-    echo "  1. 确保 PostgreSQL 正在运行"
-    echo "  2. 创建数据库: sudo -u postgres createdb aaip_data"
-    echo "  3. 授权用户: sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE aaip_data TO $USER;\""
-    echo "  4. 初始化表: cd backend && source venv/bin/activate && python3 -c 'from database_init import init_database; init_database()'"
-    echo ""
-    deactivate
-    exit 1
+    print_info "尝试自动配置数据库权限..."
+
+    # 授权当前用户访问数据库
+    if sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE aaip_data_trend_dev_db TO $USER;" 2>/dev/null; then
+        print_success "数据库权限已配置"
+
+        # 再次测试连接
+        if python3 -c "import psycopg2; import os; conn = psycopg2.connect(os.getenv('DATABASE_URL', 'postgresql://randy@localhost/aaip_data_trend_dev_db')); conn.close(); print('✅ 数据库连接成功')" 2>/dev/null; then
+            print_success "数据库连接正常"
+        else
+            print_error "仍然无法连接数据库"
+            echo ""
+            print_info "需要手动配置 PostgreSQL 认证："
+            echo "  1. 编辑配置文件: sudo nano /etc/postgresql/*/main/pg_hba.conf"
+            echo "  2. 找到这一行: local   all   all   peer"
+            echo "  3. 改为: local   all   all   trust"
+            echo "  4. 重启: sudo systemctl restart postgresql"
+            echo ""
+            deactivate
+            exit 1
+        fi
+    else
+        print_error "无法自动配置权限"
+        echo ""
+        print_info "请手动执行："
+        echo "  sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE aaip_data_trend_dev_db TO $USER;\""
+        echo ""
+        deactivate
+        exit 1
+    fi
 fi
 
 # ============================================
