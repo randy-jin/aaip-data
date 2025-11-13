@@ -180,7 +180,7 @@ jobs:
           npm install --prefer-offline
 
           echo "🏗️ Building frontend..."
-          VITE_API_URL=http://aaip-backend.randy-jt.com npm run build
+          npm run build
 
           echo "📤 Deploying to web server..."
           sudo cp -r dist/* /var/www/aaip-test/
