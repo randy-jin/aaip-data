@@ -117,7 +117,22 @@ jobs:
         echo "🔗 Connecting to server via Cloudflare Tunnel..."
         ssh cf-tunnel << 'ENDSSH'
           set -e
+
+          # Check if deploy path exists
+          if [ ! -d "${{ secrets.TEST_DEPLOY_PATH }}" ]; then
+            echo "⚠️ Deploy path does not exist, creating..."
+            mkdir -p $(dirname ${{ secrets.TEST_DEPLOY_PATH }})
+            cd $(dirname ${{ secrets.TEST_DEPLOY_PATH }})
+            git clone https://github.com/${{ github.repository }}.git $(basename ${{ secrets.TEST_DEPLOY_PATH }})
+          fi
+
           cd ${{ secrets.TEST_DEPLOY_PATH }}
+
+          # Verify it's a git repository
+          if [ ! -d ".git" ]; then
+            echo "❌ Not a git repository!"
+            exit 1
+          fi
 
           echo "📥 Pulling latest code..."
           git fetch origin
