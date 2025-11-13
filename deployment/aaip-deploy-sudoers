@@ -17,5 +17,12 @@ randy ALL=(ALL) NOPASSWD: /bin/systemctl enable aaip-backend-test
 randy ALL=(ALL) NOPASSWD: /bin/cp -r * /var/www/aaip-test/*
 randy ALL=(ALL) NOPASSWD: /bin/cp * /var/www/aaip-test/*
 
+# Allow randy to manage nginx
+randy ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
+randy ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+randy ALL=(ALL) NOPASSWD: /bin/systemctl status nginx
+randy ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+
 # Allow randy to view logs
 randy ALL=(ALL) NOPASSWD: /bin/journalctl -u aaip-backend-test *
+randy ALL=(ALL) NOPASSWD: /bin/journalctl -u nginx *

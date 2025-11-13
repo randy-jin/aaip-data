@@ -168,7 +168,67 @@ curl http://localhost:8000/api/stats
 ls -la /var/www/aaip-test/
 ```
 
-## Step 6: Verify GitHub Actions Can Connect
+## Step 6: Setup Nginx for Frontend Access
+
+### 6.1 Install Nginx
+
+```bash
+sudo apt update
+sudo apt install nginx -y
+```
+
+### 6.2 Configure Nginx
+
+```bash
+# Copy Nginx config
+sudo cp /home/randy/deploy/aaip-data/deployment/nginx-aaip-test.conf /etc/nginx/sites-available/aaip-test
+
+# Enable the site
+sudo ln -s /etc/nginx/sites-available/aaip-test /etc/nginx/sites-enabled/
+
+# Test configuration
+sudo nginx -t
+
+# Restart Nginx
+sudo systemctl restart nginx
+```
+
+### 6.3 Update Cloudflare Tunnel
+
+Edit your tunnel config to add the frontend hostname:
+
+```bash
+sudo nano ~/.cloudflared/config.yml
+```
+
+Add this ingress rule (before the 404 catch-all):
+
+```yaml
+  - hostname: aaip-test.randy.it.com
+    service: http://localhost:80
+```
+
+Restart the tunnel:
+
+```bash
+sudo systemctl restart cloudflared
+```
+
+### 6.4 Configure DNS
+
+In Cloudflare Dashboard → Zero Trust → Tunnels → Add public hostname:
+- Subdomain: `aaip-test`
+- Domain: `randy.it.com`
+- Service: `http://localhost:80`
+
+Or via CLI:
+```bash
+cloudflared tunnel route dns randy_workstation_at_home aaip-test.randy.it.com
+```
+
+**See `FRONTEND_ACCESS_GUIDE.md` for detailed instructions.**
+
+## Step 7: Verify GitHub Actions Can Connect
 
 ```bash
 # On your local machine, trigger the workflow by pushing to test branch
