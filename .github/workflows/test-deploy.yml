@@ -80,27 +80,28 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: 💾 Cache cloudflared CLI
+    - name: 💾 Cache cloudflared binary
       id: cache-cloudflared
       uses: actions/cache@v3
       with:
-        path: /usr/local/bin/cloudflared
+        path: ~/cloudflared
         key: cloudflared-${{ runner.os }}-latest
 
     - name: 🛠️ Install cloudflared CLI
-      if: steps.cache-cloudflared.outputs.cache-hit != 'true'
       run: |
-        echo "📥 Downloading cloudflared (cache miss)..."
-        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-        sudo dpkg -i cloudflared.deb
-        rm cloudflared.deb
-        echo "✅ cloudflared installed"
-
-    - name: ✅ Setup cached cloudflared
-      if: steps.cache-cloudflared.outputs.cache-hit == 'true'
-      run: |
-        echo "🎯 Using cached cloudflared CLI"
-        sudo chmod +x /usr/local/bin/cloudflared
+        if [ -f ~/cloudflared ]; then
+          echo "🎯 Using cached cloudflared binary"
+          sudo cp ~/cloudflared /usr/local/bin/cloudflared
+          sudo chmod +x /usr/local/bin/cloudflared
+        else
+          echo "📥 Downloading cloudflared (cache miss)..."
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          rm cloudflared.deb
+          # Copy to cache location
+          sudo cp /usr/bin/cloudflared ~/cloudflared || sudo cp /usr/local/bin/cloudflared ~/cloudflared
+          echo "✅ cloudflared installed and cached"
+        fi
         cloudflared --version
 
     - name: 🔑 Setup SSH Key
