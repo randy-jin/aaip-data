@@ -86,8 +86,8 @@ jobs:
         host: ${{ secrets.CF_SSH_HOSTNAME }}
         username: ${{ secrets.SSH_USER }}
         privateKey: ${{ secrets.SSH_PRIVATE_KEY }}
-        # serviceTokenId: ${{ secrets.CF_SERVICE_CLIENT_ID }}     # 如果没有配置 Cloudflare Access，不需要这两行
-        # serviceTokenSecret: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        serviceTokenId: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        serviceTokenSecret: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
         commands: |
           set -e
           cd ${{ secrets.TEST_DEPLOY_PATH }}
