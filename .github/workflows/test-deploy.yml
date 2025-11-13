@@ -75,22 +75,80 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/test'
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: 🚀 Deploy to Server via Cloudflare Tunnel
-      uses: cloudflare/cloudflared-ssh-action@v1
+
+    - name: 💾 Cache cloudflared CLI
+      id: cache-cloudflared
+      uses: actions/cache@v3
       with:
-        host: ${{ secrets.CF_SSH_HOSTNAME }}
-        username: ${{ secrets.SSH_USER }}
-        privateKey: ${{ secrets.SSH_PRIVATE_KEY }}
-        serviceTokenId: ${{ secrets.CF_SERVICE_TOKEN_ID }}
-        serviceTokenSecret: ${{ secrets.CF_SERVICE_TOKEN_SECRET }}
-        commands: |
+        path: /usr/local/bin/cloudflared
+        key: cloudflared-${{ runner.os }}-latest
+
+    - name: 🛠️ Install cloudflared CLI
+      if: steps.cache-cloudflared.outputs.cache-hit != 'true'
+      run: |
+        echo "📥 Downloading cloudflared (cache miss)..."
+        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared.deb
+        rm cloudflared.deb
+        echo "✅ cloudflared installed"
+
+    - name: ✅ Using cached cloudflared
+      if: steps.cache-cloudflared.outputs.cache-hit == 'true'
+      run: |
+        echo "🎯 Using cached cloudflared CLI"
+        cloudflared --version
+
+    - name: 🔑 Setup SSH Key
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+
+    - name: 🚀 Deploy via Cloudflare Tunnel
+      env:
+        # 临时注释掉 Access tokens 测试基本连接
+        # CF_ACCESS_CLIENT_ID: ${{ secrets.CF_SERVICE_CLIENT_ID }}
+        # CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_SERVICE_CLIENT_SECRET }}
+        SSH_USER: ${{ secrets.SSH_USER }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
+        DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
+      run: |
+        # Configure SSH to use cloudflared as ProxyCommand
+        cat >> ~/.ssh/config << 'EOF'
+        Host cf-tunnel
+            HostName ${{ secrets.CF_SSH_HOSTNAME }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/deploy_key
+            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+        EOF
+
+        echo "🔗 Connecting to server via Cloudflare Tunnel..."
+        ssh cf-tunnel << 'ENDSSH'
           set -e
-          cd ${{ secrets.TEST_DEPLOY_PATH }}
+
+          # Check if deploy path exists
+          if [ ! -d "/home/randy/deploy/aaip-data" ]; then
+            echo "⚠️ Deploy path does not exist, creating..."
+            mkdir -p /home/randy/deploy
+            cd /home/randy/deploy
+            git clone https://github.com/${{ github.repository }}.git aaip-data
+          fi
+
+          cd /home/randy/deploy/aaip-data
+
+          # Verify it's a git repository
+          if [ ! -d ".git" ]; then
+            echo "❌ Not a git repository!"
+            exit 1
+          fi
 
           echo "📥 Pulling latest code..."
           git fetch origin
@@ -99,14 +157,24 @@ jobs:
 
           echo "🔧 Updating backend..."
           cd backend
-          pip3 install -r requirements.txt --quiet
-          
+
+          # Create/activate virtual environment
+          if [ ! -d "venv" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv venv
+          fi
+          source venv/bin/activate
+
+          pip install -r requirements.txt --quiet
+          deactivate
+
           echo "♻️ Restarting backend service..."
           sudo systemctl restart aaip-backend-test
 
           echo "📦 Installing frontend dependencies..."
           cd ../frontend
-          npm ci --quiet
+          rm -rf node_modules package-lock.json
+          npm install --prefer-offline
 
           echo "🏗️ Building frontend..."
           npm run build
@@ -116,6 +184,16 @@ jobs:
 
           echo "🔧 Updating scraper dependencies..."
           cd ../scraper
-          pip3 install -r requirements.txt --quiet
+
+          # Create/activate virtual environment
+          if [ ! -d "venv" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv venv
+          fi
+          source venv/bin/activate
+
+          pip install -r requirements.txt --quiet
+          deactivate
 
           echo "✅ Deployment complete"
+        ENDSSH
