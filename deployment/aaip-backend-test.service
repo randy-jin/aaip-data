@@ -6,10 +6,10 @@ After=network.target postgresql.service
 Type=simple
 User=randy
 Group=randy
-WorkingDirectory=/home/randy/aaip-data/backend
-Environment="PATH=/home/randy/aaip-data/backend/venv/bin"
+WorkingDirectory=/home/randy/deploy/aaip-data/backend
+Environment="PATH=/home/randy/deploy/aaip-data/backend/venv/bin"
 Environment="DATABASE_URL=postgresql://localhost/aaip_data"
-ExecStart=/home/randy/aaip-data/backend/venv/bin/uvicorn main_enhanced:app --host 0.0.0.0 --port 8000
+ExecStart=/home/randy/deploy/aaip-data/backend/venv/bin/uvicorn main_enhanced:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=3
 

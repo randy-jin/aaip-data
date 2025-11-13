@@ -1,7 +1,7 @@
 # Sudoers configuration for AAIP deployment automation
 # Install this file to: /etc/sudoers.d/aaip-deploy
 # Commands:
-#   sudo cp /home/randy/aaip-data/deployment/aaip-deploy-sudoers /etc/sudoers.d/aaip-deploy
+#   sudo cp /home/randy/deploy/aaip-data/deployment/aaip-deploy-sudoers /etc/sudoers.d/aaip-deploy
 #   sudo chmod 440 /etc/sudoers.d/aaip-deploy
 #   sudo visudo -c  # Validate syntax
 

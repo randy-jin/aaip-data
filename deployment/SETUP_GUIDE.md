@@ -7,7 +7,7 @@ This guide walks you through setting up the AAIP Data Tracker backend service on
 - Ubuntu 24.04 server
 - PostgreSQL installed and running
 - User `randy` with sudo privileges
-- Repository cloned at `/home/randy/aaip-data`
+- Repository cloned at `/home/randy/deploy/aaip-data`
 
 ## Step 1: Setup Backend Service
 
@@ -15,7 +15,7 @@ This guide walks you through setting up the AAIP Data Tracker backend service on
 
 ```bash
 # On the server, run:
-cd /home/randy/aaip-data
+cd /home/randy/deploy/aaip-data
 git pull origin test  # Make sure you have latest deployment files
 
 # Copy service file to systemd directory
@@ -71,7 +71,7 @@ This allows GitHub Actions to restart the service without password prompts.
 
 ```bash
 # Copy sudoers configuration
-sudo cp deployment/aaip-deploy-sudoers /etc/sudoers.d/aaip-deploy
+sudo cp /home/randy/deploy/aaip-data/deployment/aaip-deploy-sudoers /etc/sudoers.d/aaip-deploy
 
 # Set correct permissions (MUST be 440)
 sudo chmod 440 /etc/sudoers.d/aaip-deploy
@@ -121,7 +121,7 @@ GRANT ALL PRIVILEGES ON DATABASE aaip_data TO aaip_user;
 \q
 
 # Initialize database schema
-cd /home/randy/aaip-data/backend
+cd /home/randy/deploy/aaip-data/backend
 source venv/bin/activate
 python -c "from database_init import init_database; init_database()"
 deactivate
@@ -132,7 +132,7 @@ deactivate
 Before running the GitHub Actions workflow, test the deployment steps manually:
 
 ```bash
-cd /home/randy/aaip-data
+cd /home/randy/deploy/aaip-data
 
 # Pull latest code
 git fetch origin
@@ -191,7 +191,7 @@ sudo journalctl -u aaip-backend-test -n 100 --no-pager
 
 # Common issues:
 # 1. Virtual environment not created
-cd /home/randy/aaip-data/backend
+cd /home/randy/deploy/aaip-data/backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt

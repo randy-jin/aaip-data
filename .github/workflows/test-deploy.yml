@@ -135,14 +135,14 @@ jobs:
           set -e
 
           # Check if deploy path exists
-          if [ ! -d "${{ secrets.TEST_DEPLOY_PATH }}" ]; then
+          if [ ! -d "/home/randy/deploy/aaip-data" ]; then
             echo "⚠️ Deploy path does not exist, creating..."
-            mkdir -p $(dirname ${{ secrets.TEST_DEPLOY_PATH }})
-            cd $(dirname ${{ secrets.TEST_DEPLOY_PATH }})
-            git clone https://github.com/${{ github.repository }}.git $(basename ${{ secrets.TEST_DEPLOY_PATH }})
+            mkdir -p /home/randy/deploy
+            cd /home/randy/deploy
+            git clone https://github.com/${{ github.repository }}.git aaip-data
           fi
 
-          cd ${{ secrets.TEST_DEPLOY_PATH }}
+          cd /home/randy/deploy/aaip-data
 
           # Verify it's a git repository
           if [ ! -d ".git" ]; then

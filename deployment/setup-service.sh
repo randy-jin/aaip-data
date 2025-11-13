@@ -8,7 +8,7 @@ echo "🚀 Setting up aaip-backend-test systemd service..."
 
 # Copy service file to systemd directory
 echo "📋 Copying service file..."
-sudo cp /home/randy/aaip-data/deployment/aaip-backend-test.service /etc/systemd/system/
+sudo cp /home/randy/deploy/aaip-data/deployment/aaip-backend-test.service /etc/systemd/system/
 
 # Set correct permissions
 echo "🔒 Setting permissions..."
