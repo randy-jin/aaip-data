@@ -1,0 +1,56 @@
+{
+  "header": {
+    "title": "AAIP Data Tracker",
+    "subtitle": "Alberta Advantage Immigration Program Processing Information",
+    "refresh": "Refresh Data"
+  },
+  "stats": {
+    "nominationAllocation": "Nomination Allocation",
+    "nominationsIssued": "Nominations Issued",
+    "spacesRemaining": "Spaces Remaining",
+    "applicationsToProcess": "Applications to Process"
+  },
+  "info": {
+    "totalRecords": "Total Records:",
+    "lastUpdated": "Last Updated:",
+    "streamsTracked": "Streams Tracked:"
+  },
+  "streamSelector": {
+    "label": "Select Stream:",
+    "overallSummary": "Overall Summary (All Streams)",
+    "mainStreams": "Main Streams",
+    "expressEntryPathways": "Express Entry Pathways",
+    "viewing": "Viewing:",
+    "dataPoints": "Data Points:"
+  },
+  "timeRange": {
+    "sevenDays": "7 Days",
+    "thirtyDays": "30 Days",
+    "allTime": "All Time"
+  },
+  "charts": {
+    "overallAllocationVsIssued": "2025 Overall Allocation vs Issued",
+    "allocationVsIssued": "Allocation vs Issued",
+    "nominationSpacesRemaining": "Nomination Spaces Remaining",
+    "spacesRemaining": "Spaces Remaining",
+    "applicationsToBProcessed": "Applications to be Processed",
+    "applicationsToProcess": "Applications to Process",
+    "allMetricsOverview": "All Metrics Overview",
+    "allMetrics": "All Metrics",
+    "allocation": "Allocation",
+    "issued": "Issued",
+    "remaining": "Remaining",
+    "applications": "Applications"
+  },
+  "footer": {
+    "dataSource": "Data source:",
+    "updateFrequency": "Data is collected and updated every hour"
+  },
+  "loading": {
+    "loadingData": "Loading data..."
+  },
+  "error": {
+    "errorLoadingData": "Error Loading Data",
+    "retry": "Retry"
+  }
+}

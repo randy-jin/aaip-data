@@ -1,0 +1,56 @@
+{
+  "header": {
+    "title": "AAIP 数据追踪器",
+    "subtitle": "阿尔伯塔省优势移民计划处理信息",
+    "refresh": "刷新数据"
+  },
+  "stats": {
+    "nominationAllocation": "提名配额",
+    "nominationsIssued": "已发放提名",
+    "spacesRemaining": "剩余名额",
+    "applicationsToProcess": "待处理申请"
+  },
+  "info": {
+    "totalRecords": "总记录数：",
+    "lastUpdated": "最后更新：",
+    "streamsTracked": "追踪流数："
+  },
+  "streamSelector": {
+    "label": "选择移民流：",
+    "overallSummary": "整体汇总（所有流）",
+    "mainStreams": "主要移民流",
+    "expressEntryPathways": "快速通道子类别",
+    "viewing": "正在查看：",
+    "dataPoints": "数据点数："
+  },
+  "timeRange": {
+    "sevenDays": "7 天",
+    "thirtyDays": "30 天",
+    "allTime": "全部"
+  },
+  "charts": {
+    "overallAllocationVsIssued": "2025 整体配额与已发放",
+    "allocationVsIssued": "配额与已发放",
+    "nominationSpacesRemaining": "提名剩余名额",
+    "spacesRemaining": "剩余名额",
+    "applicationsToBProcessed": "待处理申请数量",
+    "applicationsToProcess": "待处理申请",
+    "allMetricsOverview": "所有指标概览",
+    "allMetrics": "所有指标",
+    "allocation": "配额",
+    "issued": "已发放",
+    "remaining": "剩余",
+    "applications": "申请"
+  },
+  "footer": {
+    "dataSource": "数据来源：",
+    "updateFrequency": "数据每小时自动采集和更新"
+  },
+  "loading": {
+    "loadingData": "加载数据中..."
+  },
+  "error": {
+    "errorLoadingData": "加载数据出错",
+    "retry": "重试"
+  }
+}
