@@ -126,16 +126,30 @@ jobs:
         CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }} # ssh.randy.it.com
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
+        echo "--- Testing Cloudflare Tunnel connectivity ---"
+        # Test DNS resolution
+        nslookup ${CF_SSH_HOSTNAME} || echo "DNS lookup failed"
+
         echo "--- Starting Cloudflare Tunnel TCP proxy ---"
-        # Start TCP proxy in background
-        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 &
+        # Start TCP proxy in background with verbose logging
+        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 > /tmp/cf-proxy.log 2>&1 &
         PROXY_PID=$!
         echo "Proxy PID: $PROXY_PID"
-        sleep 5
+
+        # Wait for proxy to be ready
+        echo "Waiting for proxy to start..."
+        sleep 10
+
+        # Check if proxy is listening
+        netstat -tln | grep 2222 || echo "Warning: Port 2222 not listening"
+
+        # Show proxy logs
+        cat /tmp/cf-proxy.log || true
 
         echo "--- Deploying Backend via SSH ---"
         ssh -p 2222 \
           -o ConnectTimeout=30 \
+          -o ServerAliveInterval=10 \
           ${SSH_USER}@localhost << 'ENDSSH'
 
           set -e
