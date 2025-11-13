@@ -146,14 +146,30 @@ jobs:
         PROXY_PID=$!
         echo "Proxy PID: $PROXY_PID"
 
-        # Wait for proxy to be ready
+        # Wait for proxy to be ready with retries
         echo "Waiting for proxy to start..."
-        sleep 10
+        for i in {1..30}; do
+          if netstat -tln | grep -q 2222; then
+            echo "✅ Port 2222 is listening"
+            break
+          fi
+          echo "Waiting for port 2222... ($i/30)"
+          sleep 1
+        done
 
         # Check if proxy is listening
-        netstat -tln | grep 2222 || echo "Warning: Port 2222 not listening"
+        netstat -tln | grep 2222 || {
+          echo "❌ Error: Port 2222 not listening after 30 seconds"
+          cat /tmp/cf-proxy.log
+          exit 1
+        }
+
+        # Wait additional time for tunnel to stabilize
+        echo "Waiting for tunnel to stabilize..."
+        sleep 5
 
         # Show proxy logs
+        echo "Proxy logs:"
         cat /tmp/cf-proxy.log || true
 
         echo "--- Testing SSH connection ---"
@@ -197,8 +213,17 @@ jobs:
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
         echo "--- Starting Cloudflare Tunnel TCP proxy ---"
-        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 &
+        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 > /tmp/cf-proxy-fe.log 2>&1 &
         PROXY_PID=$!
+
+        # Wait for proxy with retries
+        for i in {1..30}; do
+          if netstat -tln | grep -q 2222; then
+            echo "✅ Port 2222 ready"
+            break
+          fi
+          sleep 1
+        done
         sleep 5
 
         echo "--- Deploying Frontend via SSH ---"
@@ -230,8 +255,17 @@ jobs:
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
         echo "--- Starting Cloudflare Tunnel TCP proxy ---"
-        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 &
+        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 > /tmp/cf-proxy-sc.log 2>&1 &
         PROXY_PID=$!
+
+        # Wait for proxy with retries
+        for i in {1..30}; do
+          if netstat -tln | grep -q 2222; then
+            echo "✅ Port 2222 ready"
+            break
+          fi
+          sleep 1
+        done
         sleep 5
 
         echo "--- Updating Scraper via SSH ---"
