@@ -1,73 +1,142 @@
 # AAIP Data Tracker
 
-A full-stack application to track and visualize Alberta Advantage Immigration Program (AAIP) processing information trends over time.
+实时追踪和可视化 Alberta Advantage Immigration Program (AAIP) 的处理信息。
 
-## Features
+## 🚀 快速部署
 
-- **Automated Data Collection**: Scrapes AAIP data every hour
-- **Historical Tracking**: Stores historical data to show trends
-- **Visual Dashboard**: Line charts showing changes in:
-  - 2025 nomination allocation
-  - 2025 nominations issued
-  - 2025 nomination spaces remaining
-  - Applications to be processed
+### 方式一：完整部署（推荐）
 
-## Tech Stack
+在服务器上运行一键部署脚本：
 
-### Backend
-- Python 3.11+
-- BeautifulSoup4 for web scraping
-- FastAPI for REST API
-- SQLite for data storage
-- Schedule for periodic tasks
+```bash
+cd /home/randy/deploy/aaip-data
+./deployment/deploy-all.sh
+```
 
-### Frontend
-- React 18
-- Chart.js/Recharts for visualizations
-- Tailwind CSS for styling
-- Axios for API calls
+自动完成：Backend + Frontend + Scraper + Nginx + Database 配置
 
-### Deployment
-- GitHub Actions for scheduled scraping
-- Railway/Render for backend
-- Vercel/Netlify for frontend
+### 方式二：只配置数据抓取
 
-## Project Structure
+如果只需要定时抓取数据：
+
+```bash
+cd /home/randy/deploy/aaip-data
+./deployment/setup-scraper.sh
+```
+
+## 📊 功能特性
+
+- ✅ **自动数据抓取** - 每小时自动从 alberta.ca 抓取最新数据
+- ✅ **多流支持** - 追踪所有 AAIP 流和子流程
+- ✅ **数据可视化** - 交互式图表展示历史趋势
+- ✅ **实时更新** - 数据变化时自动更新
+- ✅ **历史追踪** - 保存所有历史数据用于分析
+
+## 🏗️ 技术架构
+
+```
+┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+│   React     │ ───▶ │   FastAPI    │ ───▶ │ PostgreSQL  │
+│  Frontend   │      │   Backend    │      │  Database   │
+└─────────────┘      └──────────────┘      └─────────────┘
+                              ▲
+                              │
+                     ┌────────┴────────┐
+                     │  BeautifulSoup  │
+                     │     Scraper     │
+                     └─────────────────┘
+                              ▲
+                              │
+                     [alberta.ca/aaip]
+```
+
+## 📁 项目结构
 
 ```
 aaip-data/
-├── scraper/          # Python web scraper
-├── backend/          # FastAPI REST API
-├── frontend/         # React dashboard
-├── data/             # SQLite database
-└── .github/workflows # GitHub Actions config
+├── backend/           # FastAPI 后端服务
+├── frontend/          # React 前端应用
+├── scraper/           # 数据抓取脚本
+├── deployment/        # 部署脚本和配置
+│   ├── deploy-all.sh          # 完整部署脚本
+│   ├── setup-scraper.sh       # Scraper 配置脚本
+│   ├── update.sh              # 快速更新脚本
+│   ├── aaip-backend-test.service
+│   ├── aaip-scraper.service
+│   ├── aaip-scraper.timer
+│   ├── nginx-aaip-test.conf
+│   └── aaip-deploy-sudoers
+└── docs/              # 完整文档
 ```
 
-## Quick Start
+## 📚 文档
 
-### Scraper
+详细文档请查看 [`docs/`](docs/) 目录：
+
+- [部署指南](docs/DEPLOYMENT.md) - 完整部署教程
+- [前端配置](docs/FRONTEND_SETUP.md) - Nginx 和访问配置
+- [Scraper 配置](docs/SCRAPER_SETUP.md) - 数据抓取详细说明
+- [故障排查](docs/NGINX_TROUBLESHOOTING.md) - 常见问题解决
+- [开发指南](docs/CLAUDE.md) - 开发环境和 API
+
+## 🔄 日常更新
+
+当有新代码时，运行更新脚本：
+
 ```bash
-cd scraper
-pip install -r requirements.txt
-python scraper.py
+cd /home/randy/deploy/aaip-data
+./deployment/update.sh
 ```
 
-### Backend
+自动完成：拉取代码 + 更新依赖 + 重启服务
+
+## 🌐 访问地址
+
+部署完成后访问：
+
+- **前端**: https://aaip.randy.it.com
+- **后端 API**: https://aaip.randy.it.com/api/stats
+
+## 🛠️ 常用命令
+
 ```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
+# 查看服务状态
+sudo systemctl status aaip-backend-test
+sudo systemctl status aaip-scraper.timer
+
+# 查看日志
+sudo journalctl -u aaip-backend-test -f
+sudo journalctl -u aaip-scraper.service -f
+
+# 手动触发抓取
+sudo systemctl start aaip-scraper.service
+
+# 重启服务
+sudo systemctl restart aaip-backend-test
 ```
 
-### Frontend
+## 📊 数据库
+
 ```bash
-cd frontend
-npm install
-npm run dev
+# 连接数据库
+sudo -u postgres psql aaip_data
+
+# 查看数据
+SELECT * FROM aaip_summary ORDER BY timestamp DESC LIMIT 10;
+SELECT * FROM stream_data ORDER BY timestamp DESC LIMIT 10;
 ```
 
-The dashboard will be available at `http://localhost:3002`
+## 🤝 CI/CD
 
-## Data Source
+项目使用 GitHub Actions 自动化：
 
-https://www.alberta.ca/aaip-processing-information
+- **Test Branch**: 推送到 `test` 分支自动部署到测试服务器
+- **Scraper**: GitHub Actions 只验证代码，实际抓取在服务器本地运行
+
+## 📝 License
+
+MIT
+
+## 👨‍💻 开发
+
+本地开发请参考 [开发指南](docs/CLAUDE.md)
