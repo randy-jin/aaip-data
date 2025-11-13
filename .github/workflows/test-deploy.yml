@@ -111,14 +111,24 @@ jobs:
         echo "$SSH_PRIVATE_KEY" > ~/.ssh/github_actions_key
         chmod 600 ~/.ssh/github_actions_key
 
+        # Verify SSH key was written correctly
+        echo "SSH key first line:"
+        head -1 ~/.ssh/github_actions_key
+        echo "SSH key length: $(wc -l < ~/.ssh/github_actions_key) lines"
+
         # Add SSH config
         cat >> ~/.ssh/config << 'EOF'
         Host localhost
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
             IdentityFile ~/.ssh/github_actions_key
+            PubkeyAuthentication yes
+            PasswordAuthentication no
         EOF
         chmod 600 ~/.ssh/config
+
+        echo "SSH config created:"
+        cat ~/.ssh/config
 
     - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
@@ -145,6 +155,13 @@ jobs:
 
         # Show proxy logs
         cat /tmp/cf-proxy.log || true
+
+        echo "--- Testing SSH connection ---"
+        # Test SSH connection with verbose output
+        ssh -p 2222 -v -o ConnectTimeout=30 ${SSH_USER}@localhost "echo 'SSH connection successful'" 2>&1 | tail -20 || {
+          echo "SSH connection failed, showing last attempts..."
+          exit 1
+        }
 
         echo "--- Deploying Backend via SSH ---"
         ssh -p 2222 \
