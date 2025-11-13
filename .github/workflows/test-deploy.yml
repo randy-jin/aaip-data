@@ -80,10 +80,26 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: 💾 Cache cloudflared CLI
+      id: cache-cloudflared
+      uses: actions/cache@v3
+      with:
+        path: /usr/local/bin/cloudflared
+        key: cloudflared-${{ runner.os }}-latest
+
     - name: 🛠️ Install cloudflared CLI
+      if: steps.cache-cloudflared.outputs.cache-hit != 'true'
       run: |
+        echo "📥 Downloading cloudflared (cache miss)..."
         curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
         sudo dpkg -i cloudflared.deb
+        rm cloudflared.deb
+        echo "✅ cloudflared installed"
+
+    - name: ✅ Using cached cloudflared
+      if: steps.cache-cloudflared.outputs.cache-hit == 'true'
+      run: |
+        echo "🎯 Using cached cloudflared CLI"
         cloudflared --version
 
     - name: 🔑 Setup SSH Key
@@ -141,7 +157,16 @@ jobs:
 
           echo "🔧 Updating backend..."
           cd backend
-          pip3 install -r requirements.txt --quiet
+
+          # Create/activate virtual environment
+          if [ ! -d "venv" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv venv
+          fi
+          source venv/bin/activate
+
+          pip install -r requirements.txt --quiet
+          deactivate
 
           echo "♻️ Restarting backend service..."
           sudo systemctl restart aaip-backend-test
@@ -158,7 +183,16 @@ jobs:
 
           echo "🔧 Updating scraper dependencies..."
           cd ../scraper
-          pip3 install -r requirements.txt --quiet
+
+          # Create/activate virtual environment
+          if [ ! -d "venv" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv venv
+          fi
+          source venv/bin/activate
+
+          pip install -r requirements.txt --quiet
+          deactivate
 
           echo "✅ Deployment complete"
         ENDSSH
