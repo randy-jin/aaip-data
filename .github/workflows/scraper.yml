@@ -31,14 +31,9 @@ jobs:
         DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
       run: |
         cd scraper
-        # Only test that the scraper module loads correctly
-        # Don't actually scrape - that requires database connection
-        # Actual scraping should run on your workstation where DB is accessible
-        echo "✅ Testing scraper module import..."
-        python3 -c "import scraper_enhanced; print('✅ Scraper module loaded successfully')"
-        echo ""
-        echo "⚠️  Note: Actual scraping runs on your workstation via cron/systemd"
-        echo "   This CI job only validates the code can load properly"
+        echo "🚀 Starting AAIP data scraping..."
+        python3 scraper_enhanced.py
+        echo "✅ Scraping completed successfully"
         
     - name: Log completion
       if: always()
