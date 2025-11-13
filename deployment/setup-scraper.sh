@@ -82,7 +82,7 @@ print_step "步骤 3/5: 检查数据库连接"
 source venv/bin/activate
 
 # 尝试连接数据库
-if python3 -c "import psycopg2; import os; conn = psycopg2.connect(os.getenv('DATABASE_URL', 'postgresql://localhost/aaip_data')); conn.close(); print('✅ 数据库连接成功')" 2>/dev/null; then
+if python3 -c "import psycopg2; import os; conn = psycopg2.connect(os.getenv('DATABASE_URL', 'postgresql://localhost/aaip_data_trend_dev_db')); conn.close(); print('✅ 数据库连接成功')" 2>/dev/null; then
     print_success "数据库连接正常"
 else
     print_error "数据库连接失败"

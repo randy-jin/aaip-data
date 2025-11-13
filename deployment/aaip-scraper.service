@@ -12,7 +12,7 @@ WorkingDirectory=/home/randy/deploy/aaip-data/scraper
 Environment="PATH=/home/randy/deploy/aaip-data/scraper/venv/bin"
 
 # Database connection (update if needed)
-Environment="DATABASE_URL=postgresql://localhost/aaip_data"
+Environment="DATABASE_URL=postgresql://localhost/aaip_data_trend_dev_db"
 
 # Run the scraper
 ExecStart=/home/randy/deploy/aaip-data/scraper/venv/bin/python3 scraper_enhanced.py
