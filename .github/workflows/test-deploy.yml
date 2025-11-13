@@ -80,22 +80,66 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: 🔑 Setup SSH Key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+    - name: 💾 Cache cloudflared CLI
+      id: cache-cloudflared
+      uses: actions/cache@v3
+      with:
+        path: /usr/local/bin/cloudflared
+        key: cloudflared-${{ runner.os }}-latest
         
-    - name: 🚀 Deploy Backend via SSH
+    - name: 🛠️ Install cloudflared CLI
+      if: steps.cache-cloudflared.outputs.cache-hit != 'true'
+      run: |
+        echo "📥 Downloading cloudflared (cache miss)..."
+        curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared.deb
+        rm cloudflared.deb
+        echo "✅ cloudflared installed"
+        
+    - name: ✅ Using cached cloudflared
+      if: steps.cache-cloudflared.outputs.cache-hit == 'true'
+      run: |
+        echo "🎯 Using cached cloudflared CLI"
+        cloudflared --version
+
+    - name: 🔑 Setup SSH Key
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      run: |
+        echo "Setting up SSH key for authentication..."
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/github_actions_key
+        chmod 600 ~/.ssh/github_actions_key
+
+        # Add SSH config
+        cat >> ~/.ssh/config << 'EOF'
+        Host localhost
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            IdentityFile ~/.ssh/github_actions_key
+        EOF
+        chmod 600 ~/.ssh/config
+
+    - name: 🚀 Deploy Backend via Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.SSH_HOST }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }} # ssh.randy.it.com
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+        echo "--- Starting Cloudflare Tunnel TCP proxy ---"
+        # Start TCP proxy in background
+        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 &
+        PROXY_PID=$!
+        echo "Proxy PID: $PROXY_PID"
+        sleep 5
+
+        echo "--- Deploying Backend via SSH ---"
+        ssh -p 2222 \
+          -o ConnectTimeout=30 \
+          ${SSH_USER}@localhost << 'ENDSSH'
+
           set -e
-          cd '${{ secrets.TEST_DEPLOY_PATH }}'
+          cd ${{ secrets.TEST_DEPLOY_PATH }}
 
           echo "📥 Pulling latest code..."
           git fetch origin
@@ -111,74 +155,96 @@ jobs:
 
           echo "✅ Backend deployment complete"
         ENDSSH
+
+        echo "--- Cleaning up proxy ---"
+        kill $PROXY_PID || true
         
-    - name: 🎨 Deploy Frontend via SSH
+    - name: 🎨 Deploy Frontend via Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.SSH_HOST }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+        echo "--- Starting Cloudflare Tunnel TCP proxy ---"
+        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 &
+        PROXY_PID=$!
+        sleep 5
+
+        echo "--- Deploying Frontend via SSH ---"
+        ssh -p 2222 \
+          -o ConnectTimeout=30 \
+          ${SSH_USER}@localhost << 'ENDSSH'
+
           set -e
-          cd '${{ secrets.TEST_DEPLOY_PATH }}/frontend'
-          
+          cd ${{ secrets.TEST_DEPLOY_PATH }}/frontend
+
           echo "📦 Installing frontend dependencies..."
           npm ci --quiet
-          
+
           echo "🏗️ Building frontend..."
           npm run build
-          
+
           echo "📤 Deploying to web server..."
           sudo cp -r dist/* /var/www/aaip-test/ || echo "⚠️ Manual copy required"
-          
+
           echo "✅ Frontend deployment complete"
         ENDSSH
+
+        kill $PROXY_PID || true
         
-    - name: 🔄 Update Scraper via SSH
+    - name: 🔄 Update Scraper via Cloudflare Tunnel
       env:
         SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.SSH_HOST }}
+        CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
+        echo "--- Starting Cloudflare Tunnel TCP proxy ---"
+        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 &
+        PROXY_PID=$!
+        sleep 5
+
+        echo "--- Updating Scraper via SSH ---"
+        ssh -p 2222 \
+          -o ConnectTimeout=30 \
+          ${SSH_USER}@localhost << 'ENDSSH'
+
           set -e
-          cd '${{ secrets.TEST_DEPLOY_PATH }}/scraper'
-          
+          cd ${{ secrets.TEST_DEPLOY_PATH }}/scraper
+
           echo "🔧 Updating scraper dependencies..."
           pip3 install -r requirements.txt --quiet
-          
+
           echo "✅ Scraper update complete"
         ENDSSH
+
+        kill $PROXY_PID || true
         
     - name: 💚 Health Check
       env:
-        SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_HOST: ${{ secrets.SSH_HOST }}
         TEST_BACKEND_URL: ${{ secrets.TEST_BACKEND_URL }}
         TEST_FRONTEND_URL: ${{ secrets.TEST_FRONTEND_URL }}
       run: |
-        ssh ${SSH_USER}@${SSH_HOST} << 'ENDSSH'
-          echo "⏳ Waiting for services to start..."
-          sleep 15
-          
-          echo "🔍 Checking backend health..."
-          if curl -f -s http://localhost:8000 > /dev/null; then
-            echo "✅ Backend is healthy"
-          else
-            echo "❌ Backend health check failed"
-            exit 1
-          fi
-          
-          echo "🔍 Checking frontend..."
-          if curl -f -s http://localhost:3002 > /dev/null; then
-            echo "✅ Frontend is accessible"
-          else
-            echo "❌ Frontend health check failed"
-            exit 1
-          fi
-          
-          echo "✨ All health checks passed!"
-        ENDSSH
+        echo "⏳ Waiting for services to start..."
+        sleep 15
+        
+        echo "🔍 Checking backend health..."
+        # ... (Health Check 逻辑不变)
+        if curl -f -s ${TEST_BACKEND_URL} > /dev/null; then
+          echo "✅ Backend is healthy"
+        else
+          echo "❌ Backend health check failed"
+          exit 1
+        fi
+        
+        echo "🔍 Checking frontend..."
+        if curl -f -s ${TEST_FRONTEND_URL} > /dev/null; then
+          echo "✅ Frontend is accessible"
+        else
+          echo "❌ Frontend health check failed"
+          exit 1
+        fi
+        
+        echo "✨ All health checks passed!"
         
     - name: 📊 Deployment Summary
       if: success()
