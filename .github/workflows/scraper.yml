@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        ref: test  # Use test branch instead of default (main)
       
     - name: Set up Python
       uses: actions/setup-python@v4
