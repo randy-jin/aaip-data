@@ -1,0 +1,21 @@
+# Sudoers configuration for AAIP deployment automation
+# Install this file to: /etc/sudoers.d/aaip-deploy
+# Commands:
+#   sudo cp /home/randy/aaip-data/deployment/aaip-deploy-sudoers /etc/sudoers.d/aaip-deploy
+#   sudo chmod 440 /etc/sudoers.d/aaip-deploy
+#   sudo visudo -c  # Validate syntax
+
+# Allow randy to manage aaip-backend-test service without password
+randy ALL=(ALL) NOPASSWD: /bin/systemctl start aaip-backend-test
+randy ALL=(ALL) NOPASSWD: /bin/systemctl stop aaip-backend-test
+randy ALL=(ALL) NOPASSWD: /bin/systemctl restart aaip-backend-test
+randy ALL=(ALL) NOPASSWD: /bin/systemctl status aaip-backend-test
+randy ALL=(ALL) NOPASSWD: /bin/systemctl daemon-reload
+randy ALL=(ALL) NOPASSWD: /bin/systemctl enable aaip-backend-test
+
+# Allow randy to copy frontend files to web directory
+randy ALL=(ALL) NOPASSWD: /bin/cp -r * /var/www/aaip-test/*
+randy ALL=(ALL) NOPASSWD: /bin/cp * /var/www/aaip-test/*
+
+# Allow randy to view logs
+randy ALL=(ALL) NOPASSWD: /bin/journalctl -u aaip-backend-test *
