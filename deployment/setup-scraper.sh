@@ -75,12 +75,37 @@ deactivate
 print_success "依赖安装完成"
 
 # ============================================
-# 步骤 3: 测试运行
+# 步骤 3: 检查数据库连接
 # ============================================
-print_step "步骤 3/5: 测试 Scraper"
+print_step "步骤 3/5: 检查数据库连接"
+
+source venv/bin/activate
+
+# 尝试连接数据库
+if python3 -c "import psycopg2; import os; conn = psycopg2.connect(os.getenv('DATABASE_URL', 'postgresql://localhost/aaip_data')); conn.close(); print('✅ 数据库连接成功')" 2>/dev/null; then
+    print_success "数据库连接正常"
+else
+    print_error "数据库连接失败"
+    echo ""
+    print_info "请先配置数据库："
+    echo "  ./deployment/configure-database.sh"
+    echo ""
+    print_info "或手动配置："
+    echo "  1. 确保 PostgreSQL 正在运行"
+    echo "  2. 创建数据库: sudo -u postgres createdb aaip_data"
+    echo "  3. 授权用户: sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE aaip_data TO $USER;\""
+    echo "  4. 初始化表: cd backend && source venv/bin/activate && python3 -c 'from database_init import init_database; init_database()'"
+    echo ""
+    deactivate
+    exit 1
+fi
+
+# ============================================
+# 步骤 4: 测试运行
+# ============================================
+print_step "步骤 4/6: 测试 Scraper"
 
 print_info "运行一次测试..."
-source venv/bin/activate
 if python3 scraper_enhanced.py; then
     print_success "Scraper 测试成功"
 else
@@ -91,9 +116,9 @@ fi
 deactivate
 
 # ============================================
-# 步骤 4: 安装 Systemd Service 和 Timer
+# 步骤 5: 安装 Systemd Service 和 Timer
 # ============================================
-print_step "步骤 4/5: 安装 Systemd Service 和 Timer"
+print_step "步骤 5/6: 安装 Systemd Service 和 Timer"
 
 cd "$DEPLOY_PATH"
 
@@ -111,9 +136,9 @@ sudo systemctl daemon-reload
 print_success "Service 和 Timer 已安装"
 
 # ============================================
-# 步骤 5: 启用并启动 Timer
+# 步骤 6: 启用并启动 Timer
 # ============================================
-print_step "步骤 5/5: 启用并启动定时任务"
+print_step "步骤 6/6: 启用并启动定时任务"
 
 print_info "启用 timer（开机自启动）..."
 sudo systemctl enable aaip-scraper.timer
