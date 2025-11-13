@@ -1,0 +1,26 @@
+[Unit]
+Description=AAIP Data Scraper - Hourly scraping job
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+User=randy
+Group=randy
+WorkingDirectory=/home/randy/deploy/aaip-data/scraper
+
+# Use virtual environment
+Environment="PATH=/home/randy/deploy/aaip-data/scraper/venv/bin"
+
+# Database connection (update if needed)
+Environment="DATABASE_URL=postgresql://localhost/aaip_data"
+
+# Run the scraper
+ExecStart=/home/randy/deploy/aaip-data/scraper/venv/bin/python3 scraper_enhanced.py
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aaip-scraper
+
+[Install]
+WantedBy=multi-user.target

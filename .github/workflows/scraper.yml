@@ -26,14 +26,15 @@ jobs:
         cd scraper
         pip install -r requirements.txt
         
-    - name: Run enhanced scraper
-      env:
-        DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+    - name: Test scraper module
       run: |
         cd scraper
-        echo "🚀 Starting AAIP data scraping..."
-        python3 scraper_enhanced.py
-        echo "✅ Scraping completed successfully"
+        # Only test that the scraper module loads correctly
+        # Actual scraping runs on the server via systemd timer
+        echo "✅ Testing scraper module import..."
+        python3 -c "import scraper_enhanced; print('✅ Scraper module loaded successfully')"
+        echo ""
+        echo "ℹ️  Note: Actual scraping runs on your server every hour"
         
     - name: Log completion
       if: always()

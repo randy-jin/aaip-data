@@ -13,6 +13,17 @@ randy ALL=(ALL) NOPASSWD: /bin/systemctl status aaip-backend-test
 randy ALL=(ALL) NOPASSWD: /bin/systemctl daemon-reload
 randy ALL=(ALL) NOPASSWD: /bin/systemctl enable aaip-backend-test
 
+# Allow randy to manage aaip-scraper service and timer
+randy ALL=(ALL) NOPASSWD: /bin/systemctl start aaip-scraper.service
+randy ALL=(ALL) NOPASSWD: /bin/systemctl stop aaip-scraper.service
+randy ALL=(ALL) NOPASSWD: /bin/systemctl status aaip-scraper.service
+randy ALL=(ALL) NOPASSWD: /bin/systemctl start aaip-scraper.timer
+randy ALL=(ALL) NOPASSWD: /bin/systemctl stop aaip-scraper.timer
+randy ALL=(ALL) NOPASSWD: /bin/systemctl restart aaip-scraper.timer
+randy ALL=(ALL) NOPASSWD: /bin/systemctl status aaip-scraper.timer
+randy ALL=(ALL) NOPASSWD: /bin/systemctl enable aaip-scraper.timer
+randy ALL=(ALL) NOPASSWD: /bin/systemctl disable aaip-scraper.timer
+
 # Allow randy to copy frontend files to web directory
 randy ALL=(ALL) NOPASSWD: /bin/cp -r * /var/www/aaip-test/*
 randy ALL=(ALL) NOPASSWD: /bin/cp * /var/www/aaip-test/*
