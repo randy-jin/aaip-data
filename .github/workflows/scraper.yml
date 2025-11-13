@@ -14,7 +14,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        ref: test  # Use test branch instead of default (main)
+        ref: test  # Always use test branch (validated code only)
       
     - name: Set up Python
       uses: actions/setup-python@v4

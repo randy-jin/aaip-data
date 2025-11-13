@@ -8,6 +8,12 @@ AAIP Data Tracker is a full-stack application that scrapes, stores, and visualiz
 
 **Data Source**: https://www.alberta.ca/aaip-processing-information
 
+## Branch Strategy
+
+- **main**: Primary development branch - all development happens here
+- **test**: Testing/staging branch - manually merge main → test after verification
+- **Deployment**: Pushing to `test` branch triggers automatic deployment to test server via GitHub Actions
+
 ## Architecture
 
 ### Three-Component System

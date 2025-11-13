@@ -126,12 +126,34 @@ SELECT * FROM aaip_summary ORDER BY timestamp DESC LIMIT 10;
 SELECT * FROM stream_data ORDER BY timestamp DESC LIMIT 10;
 ```
 
-## 🤝 CI/CD
+## 🤝 开发流程
 
-项目使用 GitHub Actions 自动化：
+### 分支策略
+
+- **main**: 开发分支，日常开发在此进行
+- **test**: 测试/预发布分支，验证后手动合并 main → test
+
+### CI/CD
 
 - **Test Branch**: 推送到 `test` 分支自动部署到测试服务器
 - **Scraper**: GitHub Actions 只验证代码，实际抓取在服务器本地运行
+
+### 合并流程
+
+```bash
+# 1. 在 main 分支开发
+git checkout main
+git add .
+git commit -m "your changes"
+git push origin main
+
+# 2. 验证没问题后，合并到 test 分支
+git checkout test
+git merge main
+git push origin test
+
+# 3. 自动触发部署到测试服务器
+```
 
 ## 📝 License
 
