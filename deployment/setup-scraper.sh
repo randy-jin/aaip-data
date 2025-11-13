@@ -125,6 +125,7 @@ fi
 print_step "步骤 4/6: 测试 Scraper"
 
 print_info "运行一次测试..."
+export DATABASE_URL="dbname=aaip_data_trend_dev_db"
 if python3 scraper_enhanced.py; then
     print_success "Scraper 测试成功"
 else
