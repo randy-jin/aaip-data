@@ -54,7 +54,7 @@ print_success "PostgreSQL 正在运行"
 # ============================================
 print_step "步骤 2/5: 创建数据库"
 
-DB_NAME="aaip_data"
+DB_NAME="aaip_data_trend_dev_db"
 
 if sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw "$DB_NAME"; then
     print_info "数据库 $DB_NAME 已存在"
