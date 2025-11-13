@@ -140,50 +140,27 @@ jobs:
         # Test DNS resolution
         nslookup ${CF_SSH_HOSTNAME} || echo "DNS lookup failed"
 
-        echo "--- Starting Cloudflare Tunnel TCP proxy ---"
-        # Start TCP proxy in background with verbose logging
-        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 > /tmp/cf-proxy.log 2>&1 &
-        PROXY_PID=$!
-        echo "Proxy PID: $PROXY_PID"
+        echo "--- Starting Cloudflare Tunnel SSH proxy ---"
+        # Use SSH protocol via ProxyCommand (more stable than TCP)
+        # Create SSH config with ProxyCommand
+        cat >> ~/.ssh/config << EOF
+        Host cf-tunnel
+            HostName ${CF_SSH_HOSTNAME}
+            User ${SSH_USER}
+            ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+            IdentityFile ~/.ssh/github_actions_key
+        EOF
 
-        # Wait for proxy to be ready with retries
-        echo "Waiting for proxy to start..."
-        for i in {1..30}; do
-          if netstat -tln | grep -q 2222; then
-            echo "✅ Port 2222 is listening"
-            break
-          fi
-          echo "Waiting for port 2222... ($i/30)"
-          sleep 1
-        done
-
-        # Check if proxy is listening
-        netstat -tln | grep 2222 || {
-          echo "❌ Error: Port 2222 not listening after 30 seconds"
-          cat /tmp/cf-proxy.log
-          exit 1
-        }
-
-        # Wait additional time for tunnel to stabilize
-        echo "Waiting for tunnel to stabilize..."
-        sleep 5
-
-        # Show proxy logs
-        echo "Proxy logs:"
-        cat /tmp/cf-proxy.log || true
-
-        echo "--- Testing SSH connection ---"
-        # Test SSH connection with verbose output
-        ssh -p 2222 -v -o ConnectTimeout=30 ${SSH_USER}@localhost "echo 'SSH connection successful'" 2>&1 | tail -20 || {
-          echo "SSH connection failed, showing last attempts..."
+        echo "--- Testing SSH connection via Cloudflare Tunnel ---"
+        ssh -v cf-tunnel "echo 'SSH connection successful'" 2>&1 | tail -20 || {
+          echo "❌ SSH connection failed"
           exit 1
         }
 
         echo "--- Deploying Backend via SSH ---"
-        ssh -p 2222 \
-          -o ConnectTimeout=30 \
-          -o ServerAliveInterval=10 \
-          ${SSH_USER}@localhost << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
 
           set -e
           cd ${{ secrets.TEST_DEPLOY_PATH }}
@@ -202,9 +179,6 @@ jobs:
 
           echo "✅ Backend deployment complete"
         ENDSSH
-
-        echo "--- Cleaning up proxy ---"
-        kill $PROXY_PID || true
         
     - name: 🎨 Deploy Frontend via Cloudflare Tunnel
       env:
@@ -212,24 +186,8 @@ jobs:
         CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        echo "--- Starting Cloudflare Tunnel TCP proxy ---"
-        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 > /tmp/cf-proxy-fe.log 2>&1 &
-        PROXY_PID=$!
-
-        # Wait for proxy with retries
-        for i in {1..30}; do
-          if netstat -tln | grep -q 2222; then
-            echo "✅ Port 2222 ready"
-            break
-          fi
-          sleep 1
-        done
-        sleep 5
-
         echo "--- Deploying Frontend via SSH ---"
-        ssh -p 2222 \
-          -o ConnectTimeout=30 \
-          ${SSH_USER}@localhost << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
 
           set -e
           cd ${{ secrets.TEST_DEPLOY_PATH }}/frontend
@@ -245,8 +203,6 @@ jobs:
 
           echo "✅ Frontend deployment complete"
         ENDSSH
-
-        kill $PROXY_PID || true
         
     - name: 🔄 Update Scraper via Cloudflare Tunnel
       env:
@@ -254,24 +210,8 @@ jobs:
         CF_SSH_HOSTNAME: ${{ secrets.CF_SSH_HOSTNAME }}
         DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
       run: |
-        echo "--- Starting Cloudflare Tunnel TCP proxy ---"
-        /usr/local/bin/cloudflared access tcp --hostname ${CF_SSH_HOSTNAME} --url tcp://localhost:2222 > /tmp/cf-proxy-sc.log 2>&1 &
-        PROXY_PID=$!
-
-        # Wait for proxy with retries
-        for i in {1..30}; do
-          if netstat -tln | grep -q 2222; then
-            echo "✅ Port 2222 ready"
-            break
-          fi
-          sleep 1
-        done
-        sleep 5
-
         echo "--- Updating Scraper via SSH ---"
-        ssh -p 2222 \
-          -o ConnectTimeout=30 \
-          ${SSH_USER}@localhost << 'ENDSSH'
+        ssh cf-tunnel << 'ENDSSH'
 
           set -e
           cd ${{ secrets.TEST_DEPLOY_PATH }}/scraper
@@ -281,8 +221,6 @@ jobs:
 
           echo "✅ Scraper update complete"
         ENDSSH
-
-        kill $PROXY_PID || true
         
     - name: 💚 Health Check
       env:
