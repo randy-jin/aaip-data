@@ -45,7 +45,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd frontend
-        npm ci --ignore-scripts --ignore-scripts
+        npm ci
         
     - name: Test scraper
       env:
@@ -173,7 +173,8 @@ jobs:
 
           echo "📦 Installing frontend dependencies..."
           cd ../frontend
-          npm ci --quiet
+          rm -rf node_modules package-lock.json
+          npm install --prefer-offline
 
           echo "🏗️ Building frontend..."
           npm run build
