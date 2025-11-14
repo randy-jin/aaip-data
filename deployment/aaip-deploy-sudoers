@@ -25,8 +25,8 @@ randy ALL=(ALL) NOPASSWD: /bin/systemctl enable aaip-scraper.timer
 randy ALL=(ALL) NOPASSWD: /bin/systemctl disable aaip-scraper.timer
 
 # Allow randy to copy frontend files to web directory
-randy ALL=(ALL) NOPASSWD: /bin/cp -r * /var/www/aaip-test/*
-randy ALL=(ALL) NOPASSWD: /bin/cp * /var/www/aaip-test/*
+randy ALL=(ALL) NOPASSWD: /bin/cp -r /home/randy/deploy/aaip-data/frontend/dist/* /var/www/aaip-test/
+randy ALL=(ALL) NOPASSWD: /bin/cp /home/randy/deploy/aaip-data/frontend/dist/* /var/www/aaip-test/
 
 # Allow randy to manage nginx
 randy ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx

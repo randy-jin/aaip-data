@@ -1,0 +1,502 @@
+"""
+AAIP Data API with Draw Records Support
+FastAPI backend for serving AAIP historical data and draw information
+"""
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+from datetime import datetime, date
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI(
+    title="AAIP Data API with Draws",
+    description="API for Alberta Advantage Immigration Program processing data and draw information",
+    version="2.0.0"
+)
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Database configuration
+DATABASE_URL = os.getenv('DATABASE_URL')
+DB_HOST = os.getenv('DB_HOST', 'localhost')
+DB_PORT = os.getenv('DB_PORT', '5432')
+DB_NAME = os.getenv('DB_NAME', 'aaip_data')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+
+
+# Pydantic models
+class AAIPSummary(BaseModel):
+    id: int
+    timestamp: str
+    nomination_allocation: Optional[int]
+    nominations_issued: Optional[int]
+    nomination_spaces_remaining: Optional[int]
+    applications_to_process: Optional[int]
+    last_updated: Optional[str]
+
+
+class DrawRecord(BaseModel):
+    id: int
+    draw_date: str
+    draw_number: Optional[str]
+    stream_category: str
+    stream_detail: Optional[str]
+    min_score: Optional[int]
+    invitations_issued: Optional[int]
+    created_at: str
+    updated_at: str
+
+
+class DrawStats(BaseModel):
+    stream_category: str
+    stream_detail: Optional[str]
+    total_draws: int
+    total_invitations: int
+    avg_score: Optional[float]
+    min_score: Optional[int]
+    max_score: Optional[int]
+    latest_draw_date: Optional[str]
+    earliest_draw_date: Optional[str]
+
+
+class StreamList(BaseModel):
+    categories: List[str]
+    streams: List[Dict[str, str]]
+
+
+class Stats(BaseModel):
+    total_records: int
+    first_record: Optional[str]
+    last_record: Optional[str]
+    latest_data: Optional[AAIPSummary]
+    total_draws: int
+    latest_draw_date: Optional[str]
+
+
+class DrawTrendData(BaseModel):
+    date: str
+    min_score: Optional[int]
+    invitations: Optional[int]
+    stream_category: str
+    stream_detail: Optional[str]
+
+
+def get_db_connection():
+    """Get PostgreSQL database connection"""
+    try:
+        if DATABASE_URL:
+            return psycopg2.connect(DATABASE_URL)
+        else:
+            return psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
+
+
+@app.get("/")
+def root():
+    """Root endpoint"""
+    return {
+        "message": "AAIP Data API with Draw Records (PostgreSQL)",
+        "version": "2.0.0",
+        "endpoints": {
+            "stats": "/api/stats",
+            "summary": "/api/summary",
+            "latest": "/api/summary/latest",
+            "draws": "/api/draws",
+            "draw_streams": "/api/draws/streams",
+            "draw_trends": "/api/draws/trends",
+            "draw_stats": "/api/draws/stats"
+        }
+    }
+
+
+@app.get("/api/stats", response_model=Stats)
+def get_stats():
+    """Get database statistics including draws"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Get summary stats
+        cursor.execute("SELECT COUNT(*) as count FROM aaip_summary")
+        total = cursor.fetchone()['count']
+        
+        cursor.execute("SELECT timestamp FROM aaip_summary ORDER BY timestamp ASC LIMIT 1")
+        first = cursor.fetchone()
+        first_timestamp = first['timestamp'].isoformat() if first else None
+        
+        cursor.execute("SELECT timestamp FROM aaip_summary ORDER BY timestamp DESC LIMIT 1")
+        last = cursor.fetchone()
+        last_timestamp = last['timestamp'].isoformat() if last else None
+        
+        # Get latest summary data
+        cursor.execute("""
+            SELECT id, timestamp, nomination_allocation, nominations_issued,
+                   nomination_spaces_remaining, applications_to_process, last_updated
+            FROM aaip_summary
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """)
+        latest_row = cursor.fetchone()
+        
+        latest_data = None
+        if latest_row:
+            latest_data = AAIPSummary(
+                id=latest_row['id'],
+                timestamp=latest_row['timestamp'].isoformat(),
+                nomination_allocation=latest_row['nomination_allocation'],
+                nominations_issued=latest_row['nominations_issued'],
+                nomination_spaces_remaining=latest_row['nomination_spaces_remaining'],
+                applications_to_process=latest_row['applications_to_process'],
+                last_updated=latest_row['last_updated']
+            )
+        
+        # Get draws stats
+        cursor.execute("SELECT COUNT(*) as count FROM aaip_draws")
+        total_draws = cursor.fetchone()['count']
+        
+        cursor.execute("SELECT draw_date FROM aaip_draws ORDER BY draw_date DESC LIMIT 1")
+        latest_draw = cursor.fetchone()
+        latest_draw_date = latest_draw['draw_date'].isoformat() if latest_draw else None
+        
+        cursor.close()
+        conn.close()
+        
+        return Stats(
+            total_records=total,
+            first_record=first_timestamp,
+            last_record=last_timestamp,
+            latest_data=latest_data,
+            total_draws=total_draws,
+            latest_draw_date=latest_draw_date
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/summary", response_model=List[AAIPSummary])
+def get_summary(limit: Optional[int] = 100, offset: Optional[int] = 0):
+    """Get all summary data with pagination"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT id, timestamp, nomination_allocation, nominations_issued,
+                   nomination_spaces_remaining, applications_to_process, last_updated
+            FROM aaip_summary
+            ORDER BY timestamp DESC
+            LIMIT %s OFFSET %s
+        """, (limit, offset))
+        
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return [
+            AAIPSummary(
+                id=row['id'],
+                timestamp=row['timestamp'].isoformat(),
+                nomination_allocation=row['nomination_allocation'],
+                nominations_issued=row['nominations_issued'],
+                nomination_spaces_remaining=row['nomination_spaces_remaining'],
+                applications_to_process=row['applications_to_process'],
+                last_updated=row['last_updated']
+            )
+            for row in rows
+        ]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/summary/latest", response_model=AAIPSummary)
+def get_latest_summary():
+    """Get the most recent summary data"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT id, timestamp, nomination_allocation, nominations_issued,
+                   nomination_spaces_remaining, applications_to_process, last_updated
+            FROM aaip_summary
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """)
+        
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="No data found")
+        
+        return AAIPSummary(
+            id=row['id'],
+            timestamp=row['timestamp'].isoformat(),
+            nomination_allocation=row['nomination_allocation'],
+            nominations_issued=row['nominations_issued'],
+            nomination_spaces_remaining=row['nomination_spaces_remaining'],
+            applications_to_process=row['applications_to_process'],
+            last_updated=row['last_updated']
+        )
+        
+    except psycopg2.Error as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws", response_model=List[DrawRecord])
+def get_draws(
+    limit: Optional[int] = 100,
+    offset: Optional[int] = 0,
+    stream_category: Optional[str] = None,
+    stream_detail: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """
+    Get draw records with optional filtering
+    
+    - **limit**: Maximum number of records to return
+    - **offset**: Number of records to skip
+    - **stream_category**: Filter by stream category
+    - **stream_detail**: Filter by stream detail/pathway
+    - **start_date**: Filter draws on or after this date (YYYY-MM-DD)
+    - **end_date**: Filter draws on or before this date (YYYY-MM-DD)
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        query = """
+            SELECT id, draw_date, draw_number, stream_category, stream_detail,
+                   min_score, invitations_issued, created_at, updated_at
+            FROM aaip_draws
+            WHERE 1=1
+        """
+        params = []
+        
+        if stream_category:
+            query += " AND stream_category = %s"
+            params.append(stream_category)
+        
+        if stream_detail:
+            query += " AND stream_detail = %s"
+            params.append(stream_detail)
+        
+        if start_date:
+            query += " AND draw_date >= %s"
+            params.append(start_date)
+        
+        if end_date:
+            query += " AND draw_date <= %s"
+            params.append(end_date)
+        
+        query += " ORDER BY draw_date DESC LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return [
+            DrawRecord(
+                id=row['id'],
+                draw_date=row['draw_date'].isoformat(),
+                draw_number=row['draw_number'],
+                stream_category=row['stream_category'],
+                stream_detail=row['stream_detail'],
+                min_score=row['min_score'],
+                invitations_issued=row['invitations_issued'],
+                created_at=row['created_at'].isoformat(),
+                updated_at=row['updated_at'].isoformat()
+            )
+            for row in rows
+        ]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws/streams", response_model=StreamList)
+def get_draw_streams():
+    """Get list of all stream categories and their details"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Get unique categories
+        cursor.execute("""
+            SELECT DISTINCT stream_category
+            FROM aaip_draws
+            ORDER BY stream_category
+        """)
+        categories = [row['stream_category'] for row in cursor.fetchall()]
+        
+        # Get category-detail combinations
+        cursor.execute("""
+            SELECT DISTINCT stream_category, stream_detail
+            FROM aaip_draws
+            ORDER BY stream_category, stream_detail
+        """)
+        streams = [
+            {
+                'category': row['stream_category'],
+                'detail': row['stream_detail'] or 'General'
+            }
+            for row in cursor.fetchall()
+        ]
+        
+        cursor.close()
+        conn.close()
+        
+        return StreamList(categories=categories, streams=streams)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws/trends", response_model=List[DrawTrendData])
+def get_draw_trends(
+    stream_category: Optional[str] = None,
+    stream_detail: Optional[str] = None,
+    year: Optional[int] = None,
+    limit: Optional[int] = 365
+):
+    """
+    Get draw trend data for visualization
+    
+    - **stream_category**: Filter by stream category
+    - **stream_detail**: Filter by stream detail
+    - **year**: Filter by year (e.g., 2025)
+    - **limit**: Maximum number of records
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        query = """
+            SELECT draw_date, stream_category, stream_detail,
+                   min_score, invitations_issued
+            FROM aaip_draws
+            WHERE 1=1
+        """
+        params = []
+        
+        if stream_category:
+            query += " AND stream_category = %s"
+            params.append(stream_category)
+        
+        if stream_detail:
+            query += " AND stream_detail = %s"
+            params.append(stream_detail)
+        
+        if year:
+            query += " AND EXTRACT(YEAR FROM draw_date) = %s"
+            params.append(year)
+        
+        query += " ORDER BY draw_date ASC LIMIT %s"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return [
+            DrawTrendData(
+                date=row['draw_date'].isoformat(),
+                min_score=row['min_score'],
+                invitations=row['invitations_issued'],
+                stream_category=row['stream_category'],
+                stream_detail=row['stream_detail'] or 'General'
+            )
+            for row in rows
+        ]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws/stats", response_model=List[DrawStats])
+def get_draw_stats(stream_category: Optional[str] = None):
+    """Get aggregated statistics for each stream"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        query = """
+            SELECT 
+                stream_category,
+                stream_detail,
+                COUNT(*) as total_draws,
+                SUM(invitations_issued) as total_invitations,
+                AVG(min_score) as avg_score,
+                MIN(min_score) as min_score,
+                MAX(min_score) as max_score,
+                MAX(draw_date) as latest_draw_date,
+                MIN(draw_date) as earliest_draw_date
+            FROM aaip_draws
+        """
+        params = []
+        
+        if stream_category:
+            query += " WHERE stream_category = %s"
+            params.append(stream_category)
+        
+        query += """
+            GROUP BY stream_category, stream_detail
+            ORDER BY stream_category, stream_detail
+        """
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return [
+            DrawStats(
+                stream_category=row['stream_category'],
+                stream_detail=row['stream_detail'],
+                total_draws=row['total_draws'],
+                total_invitations=row['total_invitations'],
+                avg_score=round(row['avg_score'], 1) if row['avg_score'] else None,
+                min_score=row['min_score'],
+                max_score=row['max_score'],
+                latest_draw_date=row['latest_draw_date'].isoformat() if row['latest_draw_date'] else None,
+                earliest_draw_date=row['earliest_draw_date'].isoformat() if row['earliest_draw_date'] else None
+            )
+            for row in rows
+        ]
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
