@@ -22,10 +22,10 @@ ON aaip_draws (draw_date, stream_category, COALESCE(stream_detail, ''));
 SELECT
     draw_date,
     stream_category,
-    COALESCE(stream_detail, 'NULL') as stream_detail,
+    COALESCE(stream_detail, 'NULL') as detail,
     COUNT(*) as count
 FROM aaip_draws
-GROUP BY draw_date, stream_category, COALESCE(stream_detail, '')
+GROUP BY draw_date, stream_category, stream_detail
 HAVING COUNT(*) > 1;
 
 -- If the above query returns any rows, there are still duplicates
