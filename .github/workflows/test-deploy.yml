@@ -52,7 +52,7 @@ jobs:
         DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       run: |
         cd scraper
-        python3 -c "import scraper_enhanced; print('Scraper module loaded successfully')"
+        python3 -c "import scraper; print('Scraper module loaded successfully')"
         
     - name: Test backend
       run: |
