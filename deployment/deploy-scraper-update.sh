@@ -72,9 +72,13 @@ print_step "Step 2/7: Checking git status"
 CURRENT_BRANCH=$(git branch --show-current)
 print_info "Current branch: $CURRENT_BRANCH"
 
-if [ "$CURRENT_BRANCH" != "main" ]; then
-    print_warning "Not on main branch, switching to main..."
-    git checkout main
+# Stash any local changes before switching branches
+if ! git diff-index --quiet HEAD --; then
+    print_warning "Local changes detected, stashing..."
+    git stash
+    STASHED=true
+else
+    STASHED=false
 fi
 
 # ============================================
@@ -85,8 +89,14 @@ print_step "Step 3/7: Pulling latest changes from repository"
 print_info "Fetching updates..."
 git fetch origin
 
-print_info "Pulling changes..."
-git pull origin main
+print_info "Pulling changes from $CURRENT_BRANCH..."
+git pull origin "$CURRENT_BRANCH"
+
+# Restore stashed changes if any
+if [ "$STASHED" = true ]; then
+    print_info "Restoring stashed changes..."
+    git stash pop || print_warning "Could not restore stashed changes (may have conflicts)"
+fi
 
 print_success "Repository updated"
 
