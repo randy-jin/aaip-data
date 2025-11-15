@@ -14,8 +14,8 @@ Environment="PATH=/home/randy/deploy/aaip-data/scraper/venv/bin"
 # Database connection (update if needed)
 Environment="DATABASE_URL=dbname=aaip_data_trend_dev_db"
 
-# Run the scraper
-ExecStart=/home/randy/deploy/aaip-data/scraper/venv/bin/python3 scraper_enhanced.py
+# Run the scraper (consolidated version with both nomination and draw data collection)
+ExecStart=/home/randy/deploy/aaip-data/scraper/venv/bin/python3 scraper.py
 
 # Logging
 StandardOutput=journal
