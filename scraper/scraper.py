@@ -479,11 +479,13 @@ def save_to_database(data):
         if data['draws']:
             print(f"Saving {draws_total} draw records...")
             for draw in data['draws']:
+                # Use ON CONFLICT with the unique index columns
+                # The index uses COALESCE(stream_detail, '') so we need to handle NULL
                 cursor.execute('''
                     INSERT INTO aaip_draws
                     (draw_date, stream_category, stream_detail, min_score, invitations_issued)
                     VALUES (%s, %s, %s, %s, %s)
-                    ON CONFLICT (draw_date, stream_category, stream_detail)
+                    ON CONFLICT (draw_date, stream_category, COALESCE(stream_detail, ''))
                     DO UPDATE SET
                         min_score = EXCLUDED.min_score,
                         invitations_issued = EXCLUDED.invitations_issued,
