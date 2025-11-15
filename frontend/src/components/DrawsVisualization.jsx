@@ -20,7 +20,8 @@ export default function DrawsVisualization() {
   const [streams, setStreams] = useState({ categories: [], streams: [] });
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedDetail, setSelectedDetail] = useState('all');
-  const [selectedYear, setSelectedYear] = useState('2025');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [availableYears, setAvailableYears] = useState([]);
   const [trendData, setTrendData] = useState([]);
   const [statsData, setStatsData] = useState([]);
   const [recentDraws, setRecentDraws] = useState([]);
@@ -39,9 +40,24 @@ export default function DrawsVisualization() {
 
   const fetchStreamsData = async () => {
     try {
-      const streamsData = await getDrawStreams();
+      const [streamsData, allDraws] = await Promise.all([
+        getDrawStreams(),
+        getDrawRecords({ limit: 1000 }) // Fetch all draws to extract years
+      ]);
+
       setStreams(streamsData);
-      
+
+      // Extract unique years from draw records
+      const years = [...new Set(allDraws.map(draw => new Date(draw.draw_date).getFullYear()))]
+        .sort((a, b) => b - a); // Sort descending (newest first)
+
+      setAvailableYears(years);
+
+      // Set default year to the most recent year with data
+      if (years.length > 0 && !years.includes(parseInt(selectedYear))) {
+        setSelectedYear(years[0].toString());
+      }
+
       if (streamsData.categories.length > 0) {
         setSelectedCategory('all');
       }
@@ -54,15 +70,18 @@ export default function DrawsVisualization() {
   const fetchDrawData = async () => {
     try {
       setLoading(true);
-      
-      const params = {
-        year: parseInt(selectedYear)
-      };
-      
+
+      const params = {};
+
+      // Only add year parameter if not "all"
+      if (selectedYear !== 'all') {
+        params.year = parseInt(selectedYear);
+      }
+
       if (selectedCategory !== 'all') {
         params.stream_category = selectedCategory;
       }
-      
+
       if (selectedDetail !== 'all') {
         params.stream_detail = selectedDetail;
       }
@@ -98,10 +117,11 @@ export default function DrawsVisualization() {
   };
 
   const getAvailableYears = () => {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let year = currentYear; year >= 2024; year--) {
-      years.push(year.toString());
+    // Only show years that have actual data
+    const years = availableYears.map(y => y.toString());
+    // Add "All Years" option only if there are multiple years
+    if (years.length > 1) {
+      return ['all', ...years];
     }
     return years;
   };
@@ -203,7 +223,9 @@ export default function DrawsVisualization() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               {getAvailableYears().map(year => (
-                <option key={year} value={year}>{year}</option>
+                <option key={year} value={year}>
+                  {year === 'all' ? 'All Years' : year}
+                </option>
               ))}
             </select>
           </div>
@@ -212,7 +234,7 @@ export default function DrawsVisualization() {
         {selectedCategory !== 'all' && selectedDetail !== 'all' && (
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-800">
-              <span className="font-semibold">Viewing:</span> {selectedCategory} - {selectedDetail} ({selectedYear})
+              <span className="font-semibold">Viewing:</span> {selectedCategory} - {selectedDetail} ({selectedYear === 'all' ? 'All Years' : selectedYear})
             </p>
           </div>
         )}

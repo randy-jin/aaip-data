@@ -13,7 +13,52 @@
   "info": {
     "totalRecords": "Total Records:",
     "lastUpdated": "Last Updated:",
-    "streamsTracked": "Streams Tracked:"
+    "streamsTracked": "Streams Tracked:",
+    "totalDraws": "Total Draws:",
+    "latestDrawDate": "Latest Draw:"
+  },
+  "tabs": {
+    "nominationSummary": "Nomination Summary",
+    "drawHistory": "Draw History"
+  },
+  "draws": {
+    "filters": "Filter Draw Data",
+    "streamCategory": "Stream Category",
+    "streamDetail": "Pathway/Sector",
+    "year": "Year",
+    "allCategories": "All Categories",
+    "allDetails": "All Pathways",
+    "viewing": "Viewing",
+    "minScore": "Min Score",
+    "invitations": "Invitations",
+    "noData": "No draw data available for the selected filters.",
+    "recentDraws": "Recent Draws",
+    "streamStats": "Stream Statistics",
+    "table": {
+      "date": "Date",
+      "stream": "Stream",
+      "detail": "Detail",
+      "minScore": "Min Score",
+      "invitations": "Invitations"
+    },
+    "stats": {
+      "totalDraws": "Total Draws",
+      "totalInvitations": "Total Invitations",
+      "avgScore": "Avg Min Score",
+      "scoreRange": "Score Range",
+      "draws": "Draws",
+      "totalInv": "Total Invitations",
+      "range": "Score Range",
+      "latestDraw": "Latest Draw"
+    },
+    "charts": {
+      "scoresTrend": "Minimum Score Trend",
+      "invitationsTrend": "Invitations Issued Trend",
+      "combined": "Score vs Invitations"
+    }
+  },
+  "yearSelector": {
+    "title": "Select Year"
   },
   "streamSelector": {
     "label": "Select Stream:",

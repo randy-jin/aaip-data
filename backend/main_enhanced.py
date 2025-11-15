@@ -5,9 +5,9 @@ FastAPI backend for serving AAIP historical data including individual streams
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, date
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
@@ -79,6 +79,45 @@ class Stats(BaseModel):
     latest_data: Optional[AAIPSummary]
     total_streams: int
     available_streams: List[str]
+    total_draws: int = 0
+    latest_draw_date: Optional[str] = None
+
+
+class DrawRecord(BaseModel):
+    id: int
+    draw_date: str
+    draw_number: Optional[str]
+    stream_category: str
+    stream_detail: Optional[str]
+    min_score: Optional[int]
+    invitations_issued: Optional[int]
+    created_at: str
+    updated_at: str
+
+
+class DrawStats(BaseModel):
+    stream_category: str
+    stream_detail: Optional[str]
+    total_draws: int
+    total_invitations: int
+    avg_score: Optional[float]
+    min_score: Optional[int]
+    max_score: Optional[int]
+    latest_draw_date: Optional[str]
+    earliest_draw_date: Optional[str]
+
+
+class StreamList(BaseModel):
+    categories: List[str]
+    streams: List[Dict[str, str]]
+
+
+class DrawTrendData(BaseModel):
+    date: str
+    min_score: Optional[int]
+    invitations: Optional[int]
+    stream_category: str
+    stream_detail: Optional[str]
 
 
 def get_db_connection():
@@ -102,15 +141,19 @@ def get_db_connection():
 def root():
     """Root endpoint"""
     return {
-        "message": "AAIP Data API (Enhanced with Multi-Stream Support)",
-        "version": "2.0.0",
+        "message": "AAIP Data API (Enhanced with Multi-Stream and Draws Support)",
+        "version": "2.1.0",
         "endpoints": {
             "stats": "/api/stats",
             "summary": "/api/summary",
             "latest": "/api/summary/latest",
-            "streams": "/api/streams (NEW)",
-            "stream_by_name": "/api/streams/{stream_name} (NEW)",
-            "stream_list": "/api/streams/list (NEW)",
+            "streams": "/api/streams",
+            "stream_by_name": "/api/streams/{stream_name}",
+            "stream_list": "/api/streams/list",
+            "draws": "/api/draws",
+            "draw_streams": "/api/draws/streams",
+            "draw_trends": "/api/draws/trends",
+            "draw_stats": "/api/draws/stats",
             "logs": "/api/logs"
         }
     }
@@ -162,23 +205,37 @@ def get_stats():
         try:
             cursor.execute("SELECT COUNT(DISTINCT stream_name) as count FROM stream_data")
             total_streams = cursor.fetchone()['count']
-            
+
             cursor.execute("SELECT DISTINCT stream_name FROM stream_data ORDER BY stream_name")
             available_streams = [row['stream_name'] for row in cursor.fetchall()]
         except:
             total_streams = 0
             available_streams = []
-        
+
+        # Get draws stats
+        try:
+            cursor.execute("SELECT COUNT(*) as count FROM aaip_draws")
+            total_draws = cursor.fetchone()['count']
+
+            cursor.execute("SELECT draw_date FROM aaip_draws ORDER BY draw_date DESC LIMIT 1")
+            latest_draw = cursor.fetchone()
+            latest_draw_date = latest_draw['draw_date'].isoformat() if latest_draw else None
+        except:
+            total_draws = 0
+            latest_draw_date = None
+
         cursor.close()
         conn.close()
-        
+
         return Stats(
             total_records=total,
             first_record=first_timestamp,
             last_record=last_timestamp,
             latest_data=latest_data,
             total_streams=total_streams,
-            available_streams=available_streams
+            available_streams=available_streams,
+            total_draws=total_draws,
+            latest_draw_date=latest_draw_date
         )
         
     except Exception as e:
@@ -426,6 +483,243 @@ def get_scrape_logs(limit: Optional[int] = 50):
             for row in rows
         ]
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws", response_model=List[DrawRecord])
+def get_draws(
+    limit: Optional[int] = 100,
+    offset: Optional[int] = 0,
+    stream_category: Optional[str] = None,
+    stream_detail: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
+):
+    """
+    Get draw records with optional filtering
+
+    - **limit**: Maximum number of records to return
+    - **offset**: Number of records to skip
+    - **stream_category**: Filter by stream category
+    - **stream_detail**: Filter by stream detail/pathway
+    - **start_date**: Filter draws on or after this date (YYYY-MM-DD)
+    - **end_date**: Filter draws on or before this date (YYYY-MM-DD)
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        query = """
+            SELECT id, draw_date, draw_number, stream_category, stream_detail,
+                   min_score, invitations_issued, created_at, updated_at
+            FROM aaip_draws
+            WHERE 1=1
+        """
+        params = []
+
+        if stream_category:
+            query += " AND stream_category = %s"
+            params.append(stream_category)
+
+        if stream_detail:
+            # Handle "General" as NULL stream_detail
+            if stream_detail == "General":
+                query += " AND stream_detail IS NULL"
+            else:
+                query += " AND stream_detail = %s"
+                params.append(stream_detail)
+
+        if start_date:
+            query += " AND draw_date >= %s"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND draw_date <= %s"
+            params.append(end_date)
+
+        query += " ORDER BY draw_date DESC LIMIT %s OFFSET %s"
+        params.extend([limit, offset])
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return [
+            DrawRecord(
+                id=row['id'],
+                draw_date=row['draw_date'].isoformat(),
+                draw_number=row['draw_number'],
+                stream_category=row['stream_category'],
+                stream_detail=row['stream_detail'],
+                min_score=row['min_score'],
+                invitations_issued=row['invitations_issued'],
+                created_at=row['created_at'].isoformat(),
+                updated_at=row['updated_at'].isoformat()
+            )
+            for row in rows
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws/streams", response_model=StreamList)
+def get_draw_streams():
+    """Get list of all stream categories and their details"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Get unique categories
+        cursor.execute("""
+            SELECT DISTINCT stream_category
+            FROM aaip_draws
+            ORDER BY stream_category
+        """)
+        categories = [row['stream_category'] for row in cursor.fetchall()]
+
+        # Get category-detail combinations
+        cursor.execute("""
+            SELECT DISTINCT stream_category, stream_detail
+            FROM aaip_draws
+            ORDER BY stream_category, stream_detail
+        """)
+        streams = [
+            {
+                'category': row['stream_category'],
+                'detail': row['stream_detail'] or 'General'
+            }
+            for row in cursor.fetchall()
+        ]
+
+        cursor.close()
+        conn.close()
+
+        return StreamList(categories=categories, streams=streams)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws/trends", response_model=List[DrawTrendData])
+def get_draw_trends(
+    stream_category: Optional[str] = None,
+    stream_detail: Optional[str] = None,
+    year: Optional[int] = None,
+    limit: Optional[int] = 365
+):
+    """
+    Get draw trend data for visualization
+
+    - **stream_category**: Filter by stream category
+    - **stream_detail**: Filter by stream detail
+    - **year**: Filter by year (e.g., 2025)
+    - **limit**: Maximum number of records
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        query = """
+            SELECT draw_date, stream_category, stream_detail,
+                   min_score, invitations_issued
+            FROM aaip_draws
+            WHERE 1=1
+        """
+        params = []
+
+        if stream_category:
+            query += " AND stream_category = %s"
+            params.append(stream_category)
+
+        if stream_detail:
+            # Handle "General" as NULL stream_detail
+            if stream_detail == "General":
+                query += " AND stream_detail IS NULL"
+            else:
+                query += " AND stream_detail = %s"
+                params.append(stream_detail)
+
+        if year:
+            query += " AND EXTRACT(YEAR FROM draw_date) = %s"
+            params.append(year)
+
+        query += " ORDER BY draw_date ASC LIMIT %s"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return [
+            DrawTrendData(
+                date=row['draw_date'].isoformat(),
+                min_score=row['min_score'],
+                invitations=row['invitations_issued'],
+                stream_category=row['stream_category'],
+                stream_detail=row['stream_detail'] or 'General'
+            )
+            for row in rows
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/draws/stats", response_model=List[DrawStats])
+def get_draw_stats(stream_category: Optional[str] = None):
+    """Get aggregated statistics for each stream"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        query = """
+            SELECT
+                stream_category,
+                stream_detail,
+                COUNT(*) as total_draws,
+                SUM(invitations_issued) as total_invitations,
+                AVG(min_score) as avg_score,
+                MIN(min_score) as min_score,
+                MAX(min_score) as max_score,
+                MAX(draw_date) as latest_draw_date,
+                MIN(draw_date) as earliest_draw_date
+            FROM aaip_draws
+        """
+        params = []
+
+        if stream_category:
+            query += " WHERE stream_category = %s"
+            params.append(stream_category)
+
+        query += """
+            GROUP BY stream_category, stream_detail
+            ORDER BY stream_category, stream_detail
+        """
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return [
+            DrawStats(
+                stream_category=row['stream_category'],
+                stream_detail=row['stream_detail'],
+                total_draws=row['total_draws'],
+                total_invitations=row['total_invitations'],
+                avg_score=round(row['avg_score'], 1) if row['avg_score'] else None,
+                min_score=row['min_score'],
+                max_score=row['max_score'],
+                latest_draw_date=row['latest_draw_date'].isoformat() if row['latest_draw_date'] else None,
+                earliest_draw_date=row['earliest_draw_date'].isoformat() if row['earliest_draw_date'] else None
+            )
+            for row in rows
+        ]
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

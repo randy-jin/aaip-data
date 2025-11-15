@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { getStats, getSummaryData, getStreamList, getStreamData } from './api';
+import DrawsVisualization from './components/DrawsVisualization';
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -14,6 +15,9 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState('all');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [availableYears, setAvailableYears] = useState([]);
+  const [activeTab, setActiveTab] = useState('summary'); // 'summary' or 'draws'
 
   useEffect(() => {
     fetchData();
@@ -45,6 +49,17 @@ function App() {
       }));
 
       setChartData(processed);
+
+      // Extract unique years from summary data
+      const years = [...new Set(summaryData.map(item => new Date(item.timestamp).getFullYear()))]
+        .sort((a, b) => b - a); // Sort descending (newest first)
+
+      setAvailableYears(years);
+
+      // Set default year to the most recent year with data
+      if (years.length > 0 && !years.includes(parseInt(selectedYear))) {
+        setSelectedYear(years[0].toString());
+      }
 
       try {
         const streams = await getStreamList();
@@ -189,13 +204,71 @@ function App() {
                       <span className="font-semibold">{t('info.streamsTracked')}</span> {stats.total_streams}
                     </span>
                   )}
+                  {stats.total_draws > 0 && (
+                    <span className="ml-4">
+                      <span className="font-semibold">{t('info.totalDraws') || 'Total Draws'}</span> {stats.total_draws}
+                    </span>
+                  )}
+                  {stats.latest_draw_date && (
+                    <span className="ml-4">
+                      <span className="font-semibold">{t('info.latestDrawDate') || 'Latest Draw'}</span> {format(parseISO(stats.latest_draw_date), 'MMM dd, yyyy')}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {streamList.length > 0 && (
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px">
+              <button
+                onClick={() => setActiveTab('summary')}
+                className={`py-4 px-6 text-sm font-medium border-b-2 transition ${
+                  activeTab === 'summary'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {t('tabs.nominationSummary') || 'Nomination Summary'}
+              </button>
+              <button
+                onClick={() => setActiveTab('draws')}
+                className={`py-4 px-6 text-sm font-medium border-b-2 transition ${
+                  activeTab === 'draws'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {t('tabs.drawHistory') || 'Draw History'} {stats?.total_draws > 0 && `(${stats.total_draws})`}
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Summary Tab Content */}
+        {activeTab === 'summary' && availableYears.length > 1 && (
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <h3 className="text-lg font-semibold text-gray-900">{t('yearSelector.title') || 'Select Year'}</h3>
+              <div className="flex gap-2">
+                {availableYears.map(year => (
+                  <button
+                    key={year}
+                    onClick={() => setSelectedYear(year.toString())}
+                    className={`px-4 py-2 rounded ${selectedYear === year.toString() ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'summary' && streamList.length > 0 && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex-1 min-w-[200px]">
@@ -244,63 +317,67 @@ function App() {
           </div>
         )}
 
-        <div className="space-y-8">
-          <ChartCard title={selectedStream === 'overall' ? t('charts.overallAllocationVsIssued') : `${selectedStream} - ${t('charts.allocationVsIssued')}`}>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={filteredData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="allocation" stroke="#3b82f6" name={t('charts.allocation')} strokeWidth={2} />
-                <Line type="monotone" dataKey="issued" stroke="#10b981" name={t('charts.issued')} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
+        {activeTab === 'summary' && (
+          <div className="space-y-8">
+            <ChartCard title={selectedStream === 'overall' ? `${selectedYear} ${t('charts.overallAllocationVsIssued').replace('2025 ', '')}` : `${selectedStream} - ${t('charts.allocationVsIssued')} (${selectedYear})`}>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={filteredData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="allocation" stroke="#3b82f6" name={t('charts.allocation')} strokeWidth={2} />
+                  <Line type="monotone" dataKey="issued" stroke="#10b981" name={t('charts.issued')} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
 
-          <ChartCard title={selectedStream === 'overall' ? t('charts.nominationSpacesRemaining') : `${selectedStream} - ${t('charts.spacesRemaining')}`}>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={filteredData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="remaining" stroke="#f59e0b" name={t('charts.remaining')} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
+            <ChartCard title={selectedStream === 'overall' ? t('charts.nominationSpacesRemaining') : `${selectedStream} - ${t('charts.spacesRemaining')}`}>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={filteredData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="remaining" stroke="#f59e0b" name={t('charts.remaining')} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
 
-          <ChartCard title={selectedStream === 'overall' ? t('charts.applicationsToBProcessed') : `${selectedStream} - ${t('charts.applicationsToProcess')}`}>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={filteredData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="applications" stroke="#8b5cf6" name={t('charts.applications')} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
+            <ChartCard title={selectedStream === 'overall' ? t('charts.applicationsToBProcessed') : `${selectedStream} - ${t('charts.applicationsToProcess')}`}>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={filteredData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="applications" stroke="#8b5cf6" name={t('charts.applications')} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
 
-          <ChartCard title={selectedStream === 'overall' ? t('charts.allMetricsOverview') : `${selectedStream} - ${t('charts.allMetrics')}`}>
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={filteredData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="allocation" stroke="#3b82f6" name={t('charts.allocation')} strokeWidth={2} />
-                <Line type="monotone" dataKey="issued" stroke="#10b981" name={t('charts.issued')} strokeWidth={2} />
-                <Line type="monotone" dataKey="remaining" stroke="#f59e0b" name={t('charts.remaining')} strokeWidth={2} />
-                <Line type="monotone" dataKey="applications" stroke="#8b5cf6" name={t('charts.applications')} strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        </div>
+            <ChartCard title={selectedStream === 'overall' ? t('charts.allMetricsOverview') : `${selectedStream} - ${t('charts.allMetrics')}`}>
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={filteredData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="allocation" stroke="#3b82f6" name={t('charts.allocation')} strokeWidth={2} />
+                  <Line type="monotone" dataKey="issued" stroke="#10b981" name={t('charts.issued')} strokeWidth={2} />
+                  <Line type="monotone" dataKey="remaining" stroke="#f59e0b" name={t('charts.remaining')} strokeWidth={2} />
+                  <Line type="monotone" dataKey="applications" stroke="#8b5cf6" name={t('charts.applications')} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </div>
+        )}
+
+        {activeTab === 'draws' && <DrawsVisualization />}
 
         <footer className="mt-12 text-center text-gray-600 text-sm">
           <p>{t('footer.dataSource')} <a href="https://www.alberta.ca/aaip-processing-information" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Alberta.ca AAIP Processing Information</a></p>

@@ -13,7 +13,52 @@
   "info": {
     "totalRecords": "总记录数：",
     "lastUpdated": "最后更新：",
-    "streamsTracked": "追踪流数："
+    "streamsTracked": "追踪流数：",
+    "totalDraws": "抽签总数：",
+    "latestDrawDate": "最新抽签："
+  },
+  "tabs": {
+    "nominationSummary": "提名汇总",
+    "drawHistory": "抽签历史"
+  },
+  "draws": {
+    "filters": "筛选抽签数据",
+    "streamCategory": "移民流类别",
+    "streamDetail": "具体途径/类别",
+    "year": "年份",
+    "allCategories": "所有类别",
+    "allDetails": "所有途径",
+    "viewing": "正在查看",
+    "minScore": "最低分数",
+    "invitations": "邀请数",
+    "noData": "所选筛选条件没有抽签数据",
+    "recentDraws": "最近抽签",
+    "streamStats": "移民流统计",
+    "table": {
+      "date": "日期",
+      "stream": "移民流",
+      "detail": "详细信息",
+      "minScore": "最低分",
+      "invitations": "邀请数"
+    },
+    "stats": {
+      "totalDraws": "抽签总数",
+      "totalInvitations": "邀请总数",
+      "avgScore": "平均最低分",
+      "scoreRange": "分数范围",
+      "draws": "抽签次数",
+      "totalInv": "邀请总数",
+      "range": "分数范围",
+      "latestDraw": "最新抽签"
+    },
+    "charts": {
+      "scoresTrend": "最低分数趋势",
+      "invitationsTrend": "邀请数量趋势",
+      "combined": "分数与邀请对比"
+    }
+  },
+  "yearSelector": {
+    "title": "选择年份"
   },
   "streamSelector": {
     "label": "选择移民流：",

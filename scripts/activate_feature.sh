@@ -21,7 +21,7 @@ cd "$(dirname "$0")"
 PROJECT_DIR=$(pwd)
 
 echo -e "${GREEN}[1/5]${NC} Updating database..."
-sudo -u postgres psql aaip_data < setup_db_draws.sql
+sudo -u randy psql aaip_data_trend_dev_db < setup_db_draws.sql
 echo -e "${GREEN}✓${NC} Database updated"
 echo
 
