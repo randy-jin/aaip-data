@@ -49,8 +49,29 @@ export const getStreamData = async (streamName, limit = 100) => {
 export const getAllStreams = async (limit = 100, offset = 0, streamType = null) => {
   const params = { limit, offset };
   if (streamType) params.stream_type = streamType;
-  
+
   const response = await api.get('/api/streams', { params });
+  return response.data;
+};
+
+// EOI Pool endpoints
+export const getLatestEOIPool = async () => {
+  const response = await api.get('/api/eoi/latest');
+  return response.data;
+};
+
+export const getEOITrends = async (streamName = null, days = 7) => {
+  const params = { days };
+  if (streamName) params.stream_name = streamName;
+
+  const response = await api.get('/api/eoi/trends', { params });
+  return response.data;
+};
+
+export const getEOIAlerts = async (thresholdPercentage = 5.0) => {
+  const response = await api.get('/api/eoi/alerts', {
+    params: { threshold_percentage: thresholdPercentage }
+  });
   return response.data;
 };
 

@@ -19,7 +19,8 @@
   },
   "tabs": {
     "nominationSummary": "Nomination Summary",
-    "drawHistory": "Draw History"
+    "drawHistory": "Draw History",
+    "eoiPool": "EOI Pool"
   },
   "draws": {
     "filters": "Filter Draw Data",

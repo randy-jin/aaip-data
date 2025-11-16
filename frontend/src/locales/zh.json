@@ -19,7 +19,8 @@
   },
   "tabs": {
     "nominationSummary": "提名汇总",
-    "drawHistory": "抽签历史"
+    "drawHistory": "抽签历史",
+    "eoiPool": "意向池"
   },
   "draws": {
     "filters": "筛选抽签数据",
