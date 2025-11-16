@@ -152,6 +152,7 @@ def scrape_aaip_data():
             'summary': None,
             'streams': [],
             'draws': [],
+            'eoi_pool': [],
             'last_updated': last_updated,
             'timestamp': current_time
         }
@@ -367,7 +368,44 @@ def scrape_aaip_data():
         else:
             print("  ⚠ Draw table not found (this is normal if no draws published yet)")
 
-        print(f"\n✓ Successfully scraped {len(all_data['streams'])} streams and {len(all_data['draws'])} draws")
+        # 9. Scrape EOI Pool Data
+        print("Scraping EOI pool data...")
+        eoi_table = None
+
+        for table in tables:
+            # Look for table with EOI pool information (Table 8)
+            # Check previous heading or table caption
+            prev_elem = table.find_previous(['h2', 'h3', 'p', 'strong'])
+            if prev_elem and 'expression of interest' in prev_elem.get_text().lower():
+                eoi_table = table
+                break
+
+        if eoi_table:
+            tbody = eoi_table.find('tbody')
+            if tbody:
+                rows = tbody.find_all('tr')
+                for row in rows:
+                    cells = row.find_all('td')
+                    if len(cells) >= 2:
+                        stream_name = cells[0].get_text(strip=True)
+                        count_text = cells[1].get_text(strip=True)
+
+                        # Skip "Total" row or empty rows
+                        if 'total' in stream_name.lower() or not stream_name:
+                            continue
+
+                        candidate_count = extract_number(count_text)
+                        if candidate_count is not None:
+                            all_data['eoi_pool'].append({
+                                'stream_name': stream_name,
+                                'candidate_count': candidate_count
+                            })
+
+                print(f"  ✓ {len(all_data['eoi_pool'])} EOI pool records collected")
+        else:
+            print("  ⚠ EOI pool table not found")
+
+        print(f"\n✓ Successfully scraped {len(all_data['streams'])} streams, {len(all_data['draws'])} draws, and {len(all_data['eoi_pool'])} EOI pools")
         return all_data
 
     except Exception as e:
@@ -505,9 +543,29 @@ def save_to_database(data):
 
             print(f"  ✓ Processed {draws_total} draws, {draws_new} new records added")
 
+        # Always save EOI pool data (changes frequently)
+        eoi_saved = 0
+        eoi_total = len(data.get('eoi_pool', []))
+        if data.get('eoi_pool'):
+            print(f"Saving {eoi_total} EOI pool records...")
+            for eoi in data['eoi_pool']:
+                cursor.execute('''
+                    INSERT INTO eoi_pool
+                    (timestamp, stream_name, candidate_count, last_updated)
+                    VALUES (%s, %s, %s, %s)
+                ''', (
+                    data['timestamp'],
+                    eoi['stream_name'],
+                    eoi['candidate_count'],
+                    data.get('last_updated')
+                ))
+                eoi_saved += 1
+
+            print(f"  ✓ Saved {eoi_saved} EOI pool records")
+
         # Log the scrape
-        status = 'success' if (has_changed or draws_new > 0) else 'no_change'
-        message = f"Streams: {'saved' if has_changed else 'unchanged'}, Draws: {draws_new} new/{draws_total} total"
+        status = 'success' if (has_changed or draws_new > 0 or eoi_saved > 0) else 'no_change'
+        message = f"Streams: {'saved' if has_changed else 'unchanged'}, Draws: {draws_new} new/{draws_total} total, EOI: {eoi_saved}"
         cursor.execute('''
             INSERT INTO scrape_log (timestamp, status, message, streams_collected, draws_collected, new_draws_added)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -517,7 +575,7 @@ def save_to_database(data):
         cursor.close()
         conn.close()
 
-        print(f"✓ Save complete - Streams: {streams_saved}, Draws: {draws_new} new/{draws_total} total")
+        print(f"✓ Save complete - Streams: {streams_saved}, Draws: {draws_new} new/{draws_total} total, EOI: {eoi_saved}")
 
     except Exception as e:
         print(f"Error saving to database: {e}")
