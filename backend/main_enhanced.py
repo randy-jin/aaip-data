@@ -724,6 +724,224 @@ def get_draw_stats(stream_category: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================
+# EOI Pool Endpoints
+# ============================================
+
+class EOIPool(BaseModel):
+    stream_name: str
+    candidate_count: int
+    timestamp: str
+    last_updated: Optional[str] = None
+
+
+class EOITrend(BaseModel):
+    stream_name: str
+    timestamp: str
+    candidate_count: int
+    change_from_previous: Optional[int] = None
+    change_percentage: Optional[float] = None
+
+
+class EOIAlert(BaseModel):
+    stream_name: str
+    current_count: int
+    previous_count: int
+    change: int
+    change_percentage: float
+    timestamp: str
+    alert_type: str  # 'significant_increase', 'significant_decrease', 'stable'
+
+
+@app.get("/api/eoi/latest", response_model=List[EOIPool])
+async def get_latest_eoi_pool():
+    """Get the most recent EOI pool data for all streams"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Get the most recent timestamp
+        cursor.execute("SELECT MAX(timestamp) as latest FROM eoi_pool")
+        latest = cursor.fetchone()
+
+        if not latest or not latest['latest']:
+            cursor.close()
+            conn.close()
+            return []
+
+        # Get all streams for the latest timestamp
+        cursor.execute("""
+            SELECT stream_name, candidate_count, timestamp, last_updated
+            FROM eoi_pool
+            WHERE timestamp = %s
+            ORDER BY candidate_count DESC
+        """, (latest['latest'],))
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return [
+            EOIPool(
+                stream_name=row['stream_name'],
+                candidate_count=row['candidate_count'],
+                timestamp=row['timestamp'].isoformat(),
+                last_updated=row['last_updated']
+            )
+            for row in rows
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/eoi/trends", response_model=List[EOITrend])
+async def get_eoi_trends(
+    stream_name: Optional[str] = None,
+    days: int = 7
+):
+    """Get EOI pool trends over time for a specific stream or all streams"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Build query
+        query = """
+            WITH ordered_data AS (
+                SELECT
+                    stream_name,
+                    timestamp,
+                    candidate_count,
+                    LAG(candidate_count) OVER (PARTITION BY stream_name ORDER BY timestamp) as prev_count
+                FROM eoi_pool
+                WHERE timestamp >= NOW() - INTERVAL '%s days'
+        """
+
+        params = [days]
+
+        if stream_name:
+            query += " AND stream_name = %s"
+            params.append(stream_name)
+
+        query += """
+            )
+            SELECT
+                stream_name,
+                timestamp,
+                candidate_count,
+                candidate_count - prev_count as change_from_previous,
+                CASE
+                    WHEN prev_count > 0
+                    THEN ROUND(((candidate_count - prev_count)::numeric / prev_count * 100), 2)
+                    ELSE NULL
+                END as change_percentage
+            FROM ordered_data
+            ORDER BY stream_name, timestamp DESC
+        """
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return [
+            EOITrend(
+                stream_name=row['stream_name'],
+                timestamp=row['timestamp'].isoformat(),
+                candidate_count=row['candidate_count'],
+                change_from_previous=row['change_from_previous'],
+                change_percentage=float(row['change_percentage']) if row['change_percentage'] else None
+            )
+            for row in rows
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/eoi/alerts", response_model=List[EOIAlert])
+async def get_eoi_alerts(threshold_percentage: float = 5.0):
+    """
+    Get EOI pool alerts for significant changes
+    threshold_percentage: Minimum percentage change to trigger alert (default 5%)
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Get latest two data points for each stream
+        cursor.execute("""
+            WITH ranked_data AS (
+                SELECT
+                    stream_name,
+                    candidate_count,
+                    timestamp,
+                    ROW_NUMBER() OVER (PARTITION BY stream_name ORDER BY timestamp DESC) as rn
+                FROM eoi_pool
+            ),
+            latest_data AS (
+                SELECT
+                    a.stream_name,
+                    a.candidate_count as current_count,
+                    a.timestamp as current_timestamp,
+                    b.candidate_count as previous_count
+                FROM ranked_data a
+                LEFT JOIN ranked_data b
+                    ON a.stream_name = b.stream_name AND b.rn = 2
+                WHERE a.rn = 1
+            )
+            SELECT
+                stream_name,
+                current_count,
+                previous_count,
+                current_count - COALESCE(previous_count, current_count) as change,
+                CASE
+                    WHEN previous_count > 0
+                    THEN ROUND(((current_count - previous_count)::numeric / previous_count * 100), 2)
+                    ELSE 0
+                END as change_percentage,
+                current_timestamp
+            FROM latest_data
+            WHERE previous_count IS NOT NULL
+            ORDER BY ABS(current_count - previous_count) DESC
+        """)
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        alerts = []
+        for row in rows:
+            change_pct = float(row['change_percentage']) if row['change_percentage'] else 0
+
+            # Determine alert type
+            if abs(change_pct) < threshold_percentage:
+                alert_type = 'stable'
+            elif change_pct > 0:
+                alert_type = 'significant_increase'
+            else:
+                alert_type = 'significant_decrease'
+
+            # Only include significant changes
+            if abs(change_pct) >= threshold_percentage:
+                alerts.append(
+                    EOIAlert(
+                        stream_name=row['stream_name'],
+                        current_count=row['current_count'],
+                        previous_count=row['previous_count'],
+                        change=row['change'],
+                        change_percentage=change_pct,
+                        timestamp=row['current_timestamp'].isoformat(),
+                        alert_type=alert_type
+                    )
+                )
+
+        return alerts
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
