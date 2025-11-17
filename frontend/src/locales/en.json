@@ -2,7 +2,8 @@
   "header": {
     "title": "AAIP Data Tracker",
     "subtitle": "Alberta Advantage Immigration Program Processing Information",
-    "refresh": "Refresh Data"
+    "refresh": "Refresh Data",
+    "calculator": "Points Calculator"
   },
   "stats": {
     "nominationAllocation": "Nomination Allocation",

@@ -2,7 +2,8 @@
   "header": {
     "title": "AAIP 数据追踪器",
     "subtitle": "阿尔伯塔省优势移民计划处理信息",
-    "refresh": "刷新数据"
+    "refresh": "刷新数据",
+    "calculator": "分数计算器"
   },
   "stats": {
     "nominationAllocation": "提名配额",
