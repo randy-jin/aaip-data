@@ -7,10 +7,11 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -753,6 +754,45 @@ class EOIAlert(BaseModel):
     alert_type: str  # 'significant_increase', 'significant_decrease', 'stable'
 
 
+# New models for Phase 1.1 enhanced features
+class SmartInsight(BaseModel):
+    type: str  # 'warning', 'positive', 'opportunity', 'info'
+    title: str
+    detail: str
+    action: Optional[str] = None
+    reasoning: Optional[str] = None
+    generated_at: str
+
+
+class QuotaCalculation(BaseModel):
+    stream_name: str
+    current_remaining: int
+    current_allocation: int
+    usage_rate_per_day: float
+    estimated_days_to_exhaust: Optional[int]
+    estimated_exhaustion_date: Optional[str]
+    confidence_level: str  # 'high', 'medium', 'low'
+    warning_level: Optional[str] = None  # 'critical', 'warning', 'normal'
+
+
+class ProcessingTimeline(BaseModel):
+    stream_name: str
+    submission_date: str
+    current_processing_date: Optional[str]
+    estimated_wait_months: Optional[float]
+    estimated_processing_date: Optional[str]
+    notes: str
+
+
+class CompetitivenessScore(BaseModel):
+    stream_name: str
+    stream_category: str
+    competitiveness_score: float  # 0-100
+    level: str  # 'Very High', 'High', 'Medium', 'Low'
+    factors: Dict[str, Any]
+    recommendation: str
+
+
 @app.get("/api/eoi/latest", response_model=List[EOIPool])
 async def get_latest_eoi_pool():
     """Get the most recent EOI pool data for all streams"""
@@ -942,6 +982,576 @@ async def get_eoi_alerts(threshold_percentage: float = 5.0):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============================================================================
+# Phase 1.1: Enhanced Features - Smart Insights & Tools
+# ============================================================================
+
+@app.get("/api/insights/weekly", response_model=List[SmartInsight])
+async def get_weekly_insights():
+    """
+    Generate smart insights based on recent data patterns
+    Analyzes: quota usage, draw frequency, score trends, EOI pool changes
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        insights = []
+        current_time = datetime.now()
+
+        # Insight 1: Check quota usage warnings
+        cursor.execute("""
+            SELECT 
+                stream_name,
+                nomination_allocation,
+                nominations_issued,
+                nomination_spaces_remaining,
+                timestamp
+            FROM stream_data
+            WHERE timestamp = (SELECT MAX(timestamp) FROM stream_data)
+            AND stream_type = 'main'
+            ORDER BY stream_name
+        """)
+        
+        streams = cursor.fetchall()
+        for stream in streams:
+            if stream['nomination_allocation'] and stream['nomination_allocation'] > 0:
+                usage_rate = (stream['nominations_issued'] or 0) / stream['nomination_allocation']
+                
+                if usage_rate > 0.85:
+                    insights.append({
+                        "type": "warning",
+                        "title": f"{stream['stream_name']} - Quota Nearly Exhausted",
+                        "detail": f"Currently at {int(usage_rate * 100)}% quota usage ({stream['nominations_issued']}/{stream['nomination_allocation']})",
+                        "action": "If you qualify for this stream, consider submitting your EOI soon",
+                        "reasoning": "Historical data shows remaining 15% typically depletes within 4-6 weeks",
+                        "generated_at": current_time.isoformat()
+                    })
+                elif usage_rate > 0.70:
+                    insights.append({
+                        "type": "info",
+                        "title": f"{stream['stream_name']} - Steady Quota Consumption",
+                        "detail": f"Currently at {int(usage_rate * 100)}% quota usage",
+                        "reasoning": "Stream is on track to exhaust quota by year-end",
+                        "generated_at": current_time.isoformat()
+                    })
+
+        # Insight 2: Draw frequency analysis
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as draw_count,
+                MIN(draw_date) as earliest,
+                MAX(draw_date) as latest
+            FROM aaip_draws
+            WHERE draw_date >= CURRENT_DATE - INTERVAL '30 days'
+        """)
+        
+        draw_freq = cursor.fetchone()
+        if draw_freq and draw_freq['draw_count']:
+            # Compare with previous 30 days
+            cursor.execute("""
+                SELECT COUNT(*) as prev_count
+                FROM aaip_draws
+                WHERE draw_date >= CURRENT_DATE - INTERVAL '60 days'
+                AND draw_date < CURRENT_DATE - INTERVAL '30 days'
+            """)
+            prev_freq = cursor.fetchone()
+            
+            if prev_freq and prev_freq['prev_count']:
+                change_pct = ((draw_freq['draw_count'] - prev_freq['prev_count']) / prev_freq['prev_count']) * 100
+                
+                if change_pct > 50:
+                    insights.append({
+                        "type": "positive",
+                        "title": "Draw Frequency Significantly Increased",
+                        "detail": f"{draw_freq['draw_count']} draws in past 30 days (vs {prev_freq['prev_count']} previously)",
+                        "reasoning": f"Draw frequency increased by {int(change_pct)}%. Possible reasons: approaching year-end quota deadline or policy adjustment",
+                        "generated_at": current_time.isoformat()
+                    })
+                elif change_pct < -30:
+                    insights.append({
+                        "type": "warning",
+                        "title": "Draw Frequency Decreased",
+                        "detail": f"Only {draw_freq['draw_count']} draws in past 30 days (vs {prev_freq['prev_count']} previously)",
+                        "reasoning": "May indicate quota constraints or policy review period",
+                        "generated_at": current_time.isoformat()
+                    })
+
+        # Insight 3: Score trend analysis for Express Entry
+        cursor.execute("""
+            SELECT 
+                min_score,
+                draw_date
+            FROM aaip_draws
+            WHERE stream_category = 'Alberta Express Entry Stream'
+            AND min_score IS NOT NULL
+            ORDER BY draw_date DESC
+            LIMIT 3
+        """)
+        
+        recent_scores = cursor.fetchall()
+        if len(recent_scores) >= 3:
+            avg_recent = sum(s['min_score'] for s in recent_scores) / len(recent_scores)
+            
+            cursor.execute("""
+                SELECT AVG(min_score) as avg_score
+                FROM (
+                    SELECT min_score
+                    FROM aaip_draws
+                    WHERE stream_category = 'Alberta Express Entry Stream'
+                    AND min_score IS NOT NULL
+                    AND draw_date < %s
+                    ORDER BY draw_date DESC
+                    LIMIT 3
+                ) as prev_draws
+            """, (recent_scores[-1]['draw_date'],))
+            
+            prev_avg = cursor.fetchone()
+            if prev_avg and prev_avg['avg_score']:
+                score_change = avg_recent - float(prev_avg['avg_score'])
+                
+                if score_change < -10:
+                    insights.append({
+                        "type": "opportunity",
+                        "title": "Express Entry Invitation Scores Declining",
+                        "detail": f"Recent average score: {int(avg_recent)} (down {int(abs(score_change))} points)",
+                        "reasoning": "Score drops may indicate pool depletion of high-score candidates or increased invitation volumes",
+                        "action": "Good time for mid-range score candidates to stay ready",
+                        "generated_at": current_time.isoformat()
+                    })
+                elif score_change > 10:
+                    insights.append({
+                        "type": "info",
+                        "title": "Express Entry Scores Trending Higher",
+                        "detail": f"Recent average score: {int(avg_recent)} (up {int(score_change)} points)",
+                        "reasoning": "May indicate influx of high-score candidates or reduced invitation volumes",
+                        "generated_at": current_time.isoformat()
+                    })
+
+        # Insight 4: EOI Pool significant changes
+        cursor.execute("""
+            WITH latest_two AS (
+                SELECT 
+                    stream_name,
+                    candidate_count,
+                    timestamp,
+                    ROW_NUMBER() OVER (PARTITION BY stream_name ORDER BY timestamp DESC) as rn
+                FROM eoi_pool
+            )
+            SELECT 
+                a.stream_name,
+                a.candidate_count as current_count,
+                b.candidate_count as previous_count
+            FROM latest_two a
+            LEFT JOIN latest_two b ON a.stream_name = b.stream_name AND b.rn = 2
+            WHERE a.rn = 1
+            AND b.candidate_count IS NOT NULL
+            AND ABS(a.candidate_count - b.candidate_count) > 50
+            ORDER BY ABS(a.candidate_count - b.candidate_count) DESC
+            LIMIT 3
+        """)
+        
+        pool_changes = cursor.fetchall()
+        for change in pool_changes:
+            delta = change['current_count'] - change['previous_count']
+            change_pct = (delta / change['previous_count']) * 100 if change['previous_count'] > 0 else 0
+            
+            if delta > 0:
+                insights.append({
+                    "type": "info",
+                    "title": f"{change['stream_name']} - EOI Pool Increased",
+                    "detail": f"Pool size: {change['current_count']} (up {delta} candidates, +{int(change_pct)}%)",
+                    "reasoning": "Increased competition may affect future draw scores",
+                    "generated_at": current_time.isoformat()
+                })
+            else:
+                insights.append({
+                    "type": "positive",
+                    "title": f"{change['stream_name']} - EOI Pool Decreased",
+                    "detail": f"Pool size: {change['current_count']} (down {abs(delta)} candidates, {int(change_pct)}%)",
+                    "reasoning": "Reduced pool size may indicate recent draws or candidate withdrawals",
+                    "generated_at": current_time.isoformat()
+                })
+
+        cursor.close()
+        conn.close()
+
+        # Sort by type priority: warning > opportunity > positive > info
+        type_priority = {'warning': 0, 'opportunity': 1, 'positive': 2, 'info': 3}
+        insights.sort(key=lambda x: type_priority.get(x['type'], 99))
+
+        return [SmartInsight(**insight) for insight in insights]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/tools/quota-calculator")
+async def calculate_quota_exhaustion(stream_name: Optional[str] = None):
+    """
+    Calculate estimated quota exhaustion date based on historical usage rate
+    Returns calculations for all streams or a specific stream
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        results = []
+
+        # Build query based on stream_name filter
+        where_clause = "AND s1.stream_name = %s" if stream_name else ""
+        params = [stream_name] if stream_name else []
+
+        cursor.execute(f"""
+            WITH latest_data AS (
+                SELECT 
+                    stream_name,
+                    nomination_allocation,
+                    nominations_issued,
+                    nomination_spaces_remaining,
+                    timestamp
+                FROM stream_data
+                WHERE timestamp = (SELECT MAX(timestamp) FROM stream_data)
+                AND stream_type = 'main'
+                {where_clause}
+            ),
+            usage_rate AS (
+                SELECT 
+                    s1.stream_name,
+                    s1.nominations_issued - COALESCE(s2.nominations_issued, 0) as issued_in_period,
+                    EXTRACT(EPOCH FROM (s1.timestamp - s2.timestamp)) / 86400 as days_elapsed
+                FROM stream_data s1
+                LEFT JOIN LATERAL (
+                    SELECT nominations_issued, timestamp
+                    FROM stream_data s3
+                    WHERE s3.stream_name = s1.stream_name
+                    AND s3.timestamp < s1.timestamp
+                    AND s3.stream_type = 'main'
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                    OFFSET 29
+                ) s2 ON true
+                WHERE s1.timestamp = (SELECT MAX(timestamp) FROM stream_data)
+                AND s1.stream_type = 'main'
+                {where_clause}
+            )
+            SELECT 
+                l.stream_name,
+                l.nomination_allocation,
+                l.nominations_issued,
+                l.nomination_spaces_remaining,
+                l.timestamp,
+                CASE 
+                    WHEN u.days_elapsed > 0 THEN u.issued_in_period / u.days_elapsed
+                    ELSE 0
+                END as usage_rate_per_day
+            FROM latest_data l
+            LEFT JOIN usage_rate u ON l.stream_name = u.stream_name
+        """, params * 2 if stream_name else [])
+
+        streams = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        for stream in streams:
+            remaining = stream['nomination_spaces_remaining'] or 0
+            rate = stream['usage_rate_per_day'] or 0
+            
+            if rate > 0 and remaining > 0:
+                days_to_exhaust = int(remaining / rate)
+                exhaustion_date = (datetime.now() + timedelta(days=days_to_exhaust)).date()
+                
+                # Determine confidence and warning level
+                if stream['nominations_issued'] and stream['nomination_allocation']:
+                    usage_pct = stream['nominations_issued'] / stream['nomination_allocation']
+                    if usage_pct > 0.85:
+                        confidence = "high"
+                        warning = "critical"
+                    elif usage_pct > 0.70:
+                        confidence = "medium"
+                        warning = "warning"
+                    else:
+                        confidence = "medium"
+                        warning = "normal"
+                else:
+                    confidence = "low"
+                    warning = "normal"
+            else:
+                days_to_exhaust = None
+                exhaustion_date = None
+                confidence = "low"
+                warning = "normal"
+
+            results.append(QuotaCalculation(
+                stream_name=stream['stream_name'],
+                current_remaining=remaining,
+                current_allocation=stream['nomination_allocation'] or 0,
+                usage_rate_per_day=round(rate, 2),
+                estimated_days_to_exhaust=days_to_exhaust,
+                estimated_exhaustion_date=exhaustion_date.isoformat() if exhaustion_date else None,
+                confidence_level=confidence,
+                warning_level=warning
+            ))
+
+        return results
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/tools/processing-timeline")
+async def estimate_processing_timeline(
+    submission_date: str = Query(..., description="Submission date in YYYY-MM-DD format"),
+    stream_name: Optional[str] = Query(None, description="Stream name (optional)")
+):
+    """
+    Estimate processing timeline based on current processing dates and historical speed
+    """
+    try:
+        from datetime import datetime, timedelta
+        from dateutil.relativedelta import relativedelta
+        
+        submission = datetime.strptime(submission_date, "%Y-%m-%d").date()
+        
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        results = []
+
+        # Build query
+        where_clause = "AND stream_name = %s" if stream_name else ""
+        params = [stream_name] if stream_name else []
+
+        cursor.execute(f"""
+            WITH latest_processing AS (
+                SELECT 
+                    stream_name,
+                    processing_date,
+                    timestamp
+                FROM stream_data
+                WHERE timestamp = (SELECT MAX(timestamp) FROM stream_data)
+                AND processing_date IS NOT NULL
+                AND stream_type = 'main'
+                {where_clause}
+            ),
+            processing_speed AS (
+                SELECT 
+                    s1.stream_name,
+                    s1.processing_date as current_date,
+                    s2.processing_date as past_date,
+                    EXTRACT(EPOCH FROM (s1.timestamp - s2.timestamp)) / 86400 as real_days,
+                    s1.processing_date::date - s2.processing_date::date as processing_days_advanced
+                FROM stream_data s1
+                LEFT JOIN LATERAL (
+                    SELECT processing_date, timestamp
+                    FROM stream_data s3
+                    WHERE s3.stream_name = s1.stream_name
+                    AND s3.processing_date IS NOT NULL
+                    AND s3.timestamp < s1.timestamp
+                    AND s3.stream_type = 'main'
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                    OFFSET 14
+                ) s2 ON true
+                WHERE s1.timestamp = (SELECT MAX(timestamp) FROM stream_data)
+                AND s1.processing_date IS NOT NULL
+                AND s1.stream_type = 'main'
+                {where_clause}
+            )
+            SELECT 
+                l.stream_name,
+                l.processing_date,
+                l.timestamp,
+                CASE 
+                    WHEN s.real_days > 0 THEN s.processing_days_advanced / s.real_days
+                    ELSE 0
+                END as days_per_real_day
+            FROM latest_processing l
+            LEFT JOIN processing_speed s ON l.stream_name = s.stream_name
+        """, params * 2 if stream_name else [])
+
+        streams = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        for stream in streams:
+            # Extract just the date part before any parentheses or "for"
+            processing_date_str = stream['processing_date']
+            current_processing = None
+            
+            if processing_date_str:
+                # Remove everything after '(' or 'for'
+                processing_date_str = processing_date_str.split('(')[0].split(' for')[0].strip()
+                
+                # Try to find a date pattern like "Month Day, Year"
+                date_pattern = r'([A-Z][a-z]+)\s+(\d{1,2}),\s+(\d{4})'
+                match = re.search(date_pattern, processing_date_str)
+                
+                if match:
+                    try:
+                        current_processing = datetime.strptime(match.group(0), "%B %d, %Y").date()
+                    except ValueError:
+                        pass
+            
+            if current_processing:
+                days_behind = (current_processing - submission).days
+                speed = stream['days_per_real_day'] or 0.5  # Default to 0.5 if no data
+                
+                if days_behind < 0:
+                    # Submission is after current processing date
+                    estimated_months = abs(days_behind) / (speed * 30)
+                    estimated_date = datetime.now().date() + timedelta(days=int(abs(days_behind) / speed))
+                    notes = f"Your submission is ahead of current processing queue. Estimated wait based on processing speed of {speed:.2f} days/day."
+                elif days_behind == 0:
+                    estimated_months = 0.5
+                    estimated_date = datetime.now().date() + timedelta(days=15)
+                    notes = "Your application is near the current processing date. Processing may begin soon."
+                else:
+                    estimated_months = days_behind / (speed * 30)
+                    estimated_date = datetime.now().date() + timedelta(days=int(days_behind / speed)) if speed > 0 else None
+                    notes = f"Processing speed: approximately {speed:.2f} processing days per calendar day."
+            else:
+                estimated_months = None
+                estimated_date = None
+                notes = "Processing date information not available for this stream."
+
+            results.append(ProcessingTimeline(
+                stream_name=stream['stream_name'],
+                submission_date=submission_date,
+                current_processing_date=stream['processing_date'],
+                estimated_wait_months=round(estimated_months, 1) if estimated_months else None,
+                estimated_processing_date=estimated_date.isoformat() if estimated_date else None,
+                notes=notes
+            ))
+
+        return results
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/tools/competitiveness", response_model=List[CompetitivenessScore])
+async def get_stream_competitiveness():
+    """
+    Calculate competitiveness score for each stream based on multiple factors:
+    - Quota utilization rate
+    - EOI pool size changes
+    - Draw frequency
+    - Average invitation scores
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        results = []
+
+        # Get latest stream data with quota info
+        cursor.execute("""
+            SELECT 
+                stream_name,
+                nomination_allocation,
+                nominations_issued,
+                nomination_spaces_remaining,
+                applications_to_process
+            FROM stream_data
+            WHERE timestamp = (SELECT MAX(timestamp) FROM stream_data)
+            AND stream_type = 'main'
+        """)
+        
+        streams = cursor.fetchall()
+
+        for stream in streams:
+            factors = {}
+            score = 50  # Base score
+            
+            # Factor 1: Quota utilization (higher = more competitive)
+            if stream['nomination_allocation'] and stream['nomination_allocation'] > 0:
+                usage_rate = (stream['nominations_issued'] or 0) / stream['nomination_allocation']
+                factors['quota_usage'] = f"{int(usage_rate * 100)}%"
+                
+                if usage_rate > 0.90:
+                    score += 25
+                    factors['quota_pressure'] = "Critical - nearly exhausted"
+                elif usage_rate > 0.75:
+                    score += 15
+                    factors['quota_pressure'] = "High - limited spaces"
+                elif usage_rate > 0.50:
+                    score += 5
+                    factors['quota_pressure'] = "Moderate"
+                else:
+                    score -= 10
+                    factors['quota_pressure'] = "Low - ample spaces available"
+
+            # Factor 2: Applications backlog
+            if stream['applications_to_process']:
+                backlog = stream['applications_to_process']
+                factors['backlog'] = f"{backlog} applications"
+                
+                if backlog > 500:
+                    score += 15
+                    factors['backlog_impact'] = "High processing volume"
+                elif backlog > 200:
+                    score += 5
+                    factors['backlog_impact'] = "Moderate volume"
+
+            # Factor 3: EOI pool size (if available)
+            cursor.execute("""
+                SELECT candidate_count
+                FROM eoi_pool
+                WHERE stream_name = %s
+                ORDER BY timestamp DESC
+                LIMIT 1
+            """, (stream['stream_name'],))
+            
+            eoi_data = cursor.fetchone()
+            if eoi_data:
+                pool_size = eoi_data['candidate_count']
+                factors['eoi_pool_size'] = f"{pool_size} candidates"
+                
+                if pool_size > 300:
+                    score += 20
+                    factors['pool_pressure'] = "Very high competition"
+                elif pool_size > 150:
+                    score += 10
+                    factors['pool_pressure'] = "High competition"
+                elif pool_size > 50:
+                    score += 5
+                    factors['pool_pressure'] = "Moderate competition"
+
+            # Determine level and recommendation
+            if score >= 80:
+                level = "Very High"
+                recommendation = "Extremely competitive. Ensure your application is perfect and consider improving qualifications."
+            elif score >= 65:
+                level = "High"
+                recommendation = "Highly competitive. Strong applications recommended. Consider timing carefully."
+            elif score >= 50:
+                level = "Medium"
+                recommendation = "Moderate competition. Good chance with solid qualifications."
+            else:
+                level = "Low"
+                recommendation = "Favorable conditions. Good opportunity to apply if eligible."
+
+            results.append(CompetitivenessScore(
+                stream_name=stream['stream_name'],
+                stream_category="AAIP",
+                competitiveness_score=min(100, max(0, score)),
+                level=level,
+                factors=factors,
+                recommendation=recommendation
+            ))
+
+        cursor.close()
+        conn.close()
+
+        # Sort by score descending
+        results.sort(key=lambda x: x.competitiveness_score, reverse=True)
+        return results
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
+    from datetime import timedelta
+    from dateutil.relativedelta import relativedelta
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -21,7 +21,9 @@
   "tabs": {
     "nominationSummary": "提名汇总",
     "drawHistory": "抽签历史",
-    "eoiPool": "意向池"
+    "eoiPool": "意向池",
+    "insights": "智能洞察",
+    "tools": "规划工具"
   },
   "draws": {
     "filters": "筛选抽签数据",
@@ -99,5 +101,35 @@
   "error": {
     "errorLoadingData": "加载数据出错",
     "retry": "重试"
+  },
+  "smartInsights": {
+    "title": "智能洞察",
+    "updated": "自动更新",
+    "noInsights": "暂时没有重要洞察。请稍后查看！",
+    "error": "加载洞察失败",
+    "recommendation": "建议",
+    "disclaimer": "这些洞察基于历史数据模式生成，仅供参考。移民政策可能随时变化，恕不另行通知。"
+  },
+  "tools": {
+    "title": "规划工具",
+    "quotaCalculator": "配额计算器",
+    "processingTimeline": "处理时间线",
+    "competitiveness": "竞争力分析",
+    "quotaDesc": "基于历史使用率的配额耗尽日期估算",
+    "remaining": "剩余",
+    "usageRate": "使用率",
+    "daysToExhaust": "预计耗尽天数",
+    "estimatedDate": "预计日期",
+    "confidence": "置信度",
+    "yourSubmissionDate": "您的提交日期",
+    "calculate": "计算",
+    "currentProcessing": "当前处理日期",
+    "estimatedWait": "预计等待时间",
+    "estimatedProcessing": "预计处理日期",
+    "enterDate": "输入您的提交日期并点击计算",
+    "competitivenessDesc": "基于配额使用、池大小和申请量的当前竞争水平",
+    "competitivenessScore": "分数",
+    "recommendation": "建议",
+    "disclaimer": "所有计算都基于历史数据和当前趋势。实际结果可能因政策变化或其他因素而有所不同。"
   }
 }

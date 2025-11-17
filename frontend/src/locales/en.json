@@ -21,7 +21,9 @@
   "tabs": {
     "nominationSummary": "Nomination Summary",
     "drawHistory": "Draw History",
-    "eoiPool": "EOI Pool"
+    "eoiPool": "EOI Pool",
+    "insights": "Smart Insights",
+    "tools": "Planning Tools"
   },
   "draws": {
     "filters": "Filter Draw Data",
@@ -99,5 +101,35 @@
   "error": {
     "errorLoadingData": "Error Loading Data",
     "retry": "Retry"
+  },
+  "smartInsights": {
+    "title": "Smart Insights",
+    "updated": "Auto-updated",
+    "noInsights": "No significant insights at this time. Check back later!",
+    "error": "Failed to load insights",
+    "recommendation": "Recommendation",
+    "disclaimer": "These insights are generated based on historical data patterns and are for informational purposes only. Immigration policies may change without notice."
+  },
+  "tools": {
+    "title": "Planning Tools",
+    "quotaCalculator": "Quota Calculator",
+    "processingTimeline": "Processing Timeline",
+    "competitiveness": "Competitiveness",
+    "quotaDesc": "Estimated quota exhaustion dates based on historical usage rates",
+    "remaining": "Remaining",
+    "usageRate": "Usage Rate",
+    "daysToExhaust": "Days to Exhaust",
+    "estimatedDate": "Est. Date",
+    "confidence": "Confidence",
+    "yourSubmissionDate": "Your Submission Date",
+    "calculate": "Calculate",
+    "currentProcessing": "Current Processing Date",
+    "estimatedWait": "Estimated Wait",
+    "estimatedProcessing": "Est. Processing Date",
+    "enterDate": "Enter your submission date and click Calculate",
+    "competitivenessDesc": "Current competition level for each stream based on quota usage, pool size, and application volume",
+    "competitivenessScore": "Score",
+    "recommendation": "Recommendation",
+    "disclaimer": "All calculations are based on historical data and current trends. Actual results may vary due to policy changes or other factors."
   }
 }

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "axios": "^1.6.2",
     "date-fns": "^2.30.0",
     "i18next": "^25.6.2",
