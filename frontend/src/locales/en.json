@@ -93,7 +93,8 @@
   },
   "footer": {
     "dataSource": "Data source:",
-    "updateFrequency": "Data is collected and updated every hour"
+    "updateFrequency": "Data is collected and updated every hour",
+    "poweredBy": "Powered by"
   },
   "loading": {
     "loadingData": "Loading data..."

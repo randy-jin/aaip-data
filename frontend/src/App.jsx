@@ -429,9 +429,12 @@ function App() {
         {/* Planning Tools Tab Content */}
         {activeTab === 'tools' && <ToolsDashboard />}
 
-        <footer className="mt-12 text-center text-gray-600 text-sm">
+        <footer className="mt-12 text-center text-gray-600 text-sm border-t border-gray-200 pt-6">
           <p>{t('footer.dataSource')} <a href="https://www.alberta.ca/aaip-processing-information" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Alberta.ca AAIP Processing Information</a></p>
           <p className="mt-2">{t('footer.updateFrequency')}</p>
+          <p className="mt-4 text-gray-500">
+            {t('footer.poweredBy')} <a href="https://www.linkedin.com/in/randy-jin-6b037523a/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">Randy Jin</a>
+          </p>
         </footer>
       </main>
     </div>

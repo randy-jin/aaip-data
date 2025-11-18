@@ -93,7 +93,8 @@
   },
   "footer": {
     "dataSource": "数据来源：",
-    "updateFrequency": "数据每小时自动采集和更新"
+    "updateFrequency": "数据每小时自动采集和更新",
+    "poweredBy": "开发者"
   },
   "loading": {
     "loadingData": "加载数据中..."
