@@ -1,0 +1,101 @@
+{
+  "timestamp": "2025-11-18T23:40:57.819381",
+  "latest_draws": [
+    {
+      "draw_date": "2024-11-19",
+      "draw_number": 289,
+      "program": "Provincial Nominee Program",
+      "invitations_issued": 1035,
+      "crs_cutoff": 798
+    },
+    {
+      "draw_date": "2024-11-05",
+      "draw_number": 288,
+      "program": "Provincial Nominee Program",
+      "invitations_issued": 1092,
+      "crs_cutoff": 795
+    },
+    {
+      "draw_date": "2024-10-22",
+      "draw_number": 287,
+      "program": "No Program Specified",
+      "invitations_issued": 4000,
+      "crs_cutoff": 542
+    },
+    {
+      "draw_date": "2024-10-08",
+      "draw_number": 286,
+      "program": "Provincial Nominee Program",
+      "invitations_issued": 1194,
+      "crs_cutoff": 791
+    },
+    {
+      "draw_date": "2024-09-24",
+      "draw_number": 285,
+      "program": "No Program Specified",
+      "invitations_issued": 4000,
+      "crs_cutoff": 539
+    }
+  ],
+  "analysis": {
+    "total_draws": 5,
+    "pnp_draws": 3,
+    "general_draws": 2,
+    "pnp": {
+      "avg_crs": 794.7,
+      "min_crs": 791,
+      "max_crs": 798,
+      "avg_invitations": 1107,
+      "trend": "stable"
+    },
+    "general": {
+      "avg_crs": 540.5,
+      "min_crs": 539,
+      "max_crs": 542,
+      "avg_invitations": 4000,
+      "trend": "stable"
+    }
+  },
+  "comparison": {
+    "aaip": {
+      "avg_crs": 53.8,
+      "min_crs": 42,
+      "avg_invitations": 140,
+      "draw_count": 10
+    },
+    "ee_pnp": {
+      "avg_crs": 794.7,
+      "min_crs": 791,
+      "max_crs": 798,
+      "avg_invitations": 1107,
+      "trend": "stable"
+    },
+    "ee_general": {
+      "avg_crs": 540.5,
+      "min_crs": 539,
+      "max_crs": 542,
+      "avg_invitations": 4000,
+      "trend": "stable"
+    },
+    "insights": [
+      {
+        "type": "advantage",
+        "category": "CRS Score",
+        "message": "AAIP typically requires 741 fewer CRS points than federal PNP draws",
+        "advantage": "AAIP"
+      },
+      {
+        "type": "advantage",
+        "category": "Processing Time",
+        "message": "AAIP provincial stage: 4-6 months, Federal stage: 6-8 months after nomination",
+        "advantage": "similar"
+      },
+      {
+        "type": "benefit",
+        "category": "Provincial Nomination",
+        "message": "AAIP nomination adds 600 CRS points, guaranteeing federal ITA",
+        "advantage": "AAIP"
+      }
+    ]
+  }
+}

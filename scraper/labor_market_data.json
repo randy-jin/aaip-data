@@ -1,0 +1,104 @@
+{
+  "quarter": "2025-Q4",
+  "update_date": "November 2025",
+  "generated_at": "2025-11-18T23:25:51.033317",
+  "streams": [
+    {
+      "name": "Healthcare (DHCP)",
+      "demand": "declining",
+      "trend": "down",
+      "sectors": [
+        "Registered Nurses",
+        "Licensed Practical Nurses",
+        "Healthcare Aides",
+        "Medical Lab Technologists"
+      ],
+      "noc_codes": [
+        "31301",
+        "32101",
+        "33102"
+      ]
+    },
+    {
+      "name": "Tourism & Hospitality",
+      "demand": "declining",
+      "trend": "down",
+      "sectors": [
+        "Cooks",
+        "Food Service Supervisors",
+        "Hotel Front Desk",
+        "Restaurant Managers"
+      ],
+      "noc_codes": [
+        "62020",
+        "63200",
+        "64300"
+      ]
+    },
+    {
+      "name": "Technology (Accelerated Tech)",
+      "demand": "declining",
+      "trend": "down",
+      "sectors": [
+        "Software Engineers",
+        "Data Scientists",
+        "DevOps Engineers",
+        "Cybersecurity"
+      ],
+      "noc_codes": [
+        "21231",
+        "21232",
+        "21233"
+      ]
+    },
+    {
+      "name": "Construction & Trades",
+      "demand": "declining",
+      "trend": "down",
+      "sectors": [
+        "Electricians",
+        "Plumbers",
+        "Carpenters",
+        "Welders"
+      ],
+      "noc_codes": [
+        "72010",
+        "72011",
+        "72012",
+        "72013"
+      ]
+    },
+    {
+      "name": "Agriculture & Rural",
+      "demand": "declining",
+      "trend": "down",
+      "sectors": [
+        "Farm Supervisors",
+        "Agricultural Workers",
+        "Meat Cutters",
+        "Food Processing"
+      ],
+      "noc_codes": [
+        "82030",
+        "84120",
+        "94141"
+      ]
+    },
+    {
+      "name": "General Business & Services",
+      "demand": "declining",
+      "trend": "down",
+      "sectors": [
+        "Retail Supervisors",
+        "Truck Drivers",
+        "Administrative Assistants",
+        "Customer Service"
+      ],
+      "noc_codes": [
+        "62010",
+        "73300",
+        "13110"
+      ]
+    }
+  ]
+}

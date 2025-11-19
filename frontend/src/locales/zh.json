@@ -135,20 +135,11 @@
     "disclaimer": "所有计算都基于历史数据和当前趋势。实际结果可能因政策变化或其他因素而有所不同。"
   },
   "laborMarket": {
-    "title": "劳动力市场洞察",
-    "insights": "劳动力市场洞察",
-    "occupations": "追踪职业",
-    "source": "基于Job Bank数据",
-    "trend": "趋势",
-    "impact": "影响",
-    "openings": "职位空缺",
-    "seekers": "求职者",
-    "wage": "中位数工资",
-    "relatedTo": "相关移民流",
-    "noData": "首次抓取后将提供劳动力市场数据。",
-    "dataSource": "数据来源：Job Bank Canada",
-    "error": "无法加载劳动力市场数据",
-    "about": "关于此数据",
-    "disclaimer": "劳动力市场数据来自Job Bank Canada，反映阿尔伯塔省的一般就业趋势。此数据有助于理解AAIP移民流的优先级，但不保证提名结果。"
+    "title": "阿尔伯塔劳动力市场概况",
+    "lastUpdated": "最后更新",
+    "keySectors": "主要职业",
+    "important": "重要信息",
+    "contextNote": "此劳动力市场信息提供阿尔伯塔省就业趋势的一般背景。不保证AAIP提名结果。",
+    "updateSchedule": "本页面根据阿尔伯塔省经济报告和政府出版物每季度手动更新。获取最准确的AAIP信息，请参阅官方"
   }
 }

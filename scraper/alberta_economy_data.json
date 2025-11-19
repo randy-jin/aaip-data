@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-11-18T23:36:44.645912",
+  "unemployment_rate": 6.8,
+  "gdp_growth": 2.8,
+  "population_growth": 3.9,
+  "oil_price": {
+    "price": 82.5,
+    "trend": "stable"
+  },
+  "insights": [
+    {
+      "type": "positive",
+      "indicator": "GDP Growth",
+      "message": "Strong GDP growth (2.8%) reflects economic expansion",
+      "aaip_impact": "Positive economic climate supports continued AAIP growth"
+    },
+    {
+      "type": "positive",
+      "indicator": "Population Growth",
+      "message": "Rapid population growth (3.9%) creates demand for services and infrastructure",
+      "aaip_impact": "Sustained immigration needed to support population growth"
+    },
+    {
+      "type": "positive",
+      "indicator": "Energy Sector",
+      "message": "Strong oil prices ($82.5/barrel) benefit Alberta's energy sector",
+      "aaip_impact": "Positive for energy-related occupations and overall provincial revenue"
+    }
+  ]
+}

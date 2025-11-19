@@ -135,20 +135,11 @@
     "disclaimer": "All calculations are based on historical data and current trends. Actual results may vary due to policy changes or other factors."
   },
   "laborMarket": {
-    "title": "Labor Market Insights",
-    "insights": "Labor Market Insights",
-    "occupations": "Tracked Occupations",
-    "source": "Based on Job Bank data",
-    "trend": "Trend",
-    "impact": "Impact",
-    "openings": "Job Openings",
-    "seekers": "Job Seekers",
-    "wage": "Median Wage",
-    "relatedTo": "Related to",
-    "noData": "Labor market data will be available after the first scraping run.",
-    "dataSource": "Data source: Job Bank Canada",
-    "error": "Failed to load labor market data",
-    "about": "About This Data",
-    "disclaimer": "Labor market data is sourced from Job Bank Canada and reflects general employment trends in Alberta. This data provides context for understanding AAIP stream priorities but does not guarantee nomination outcomes."
+    "title": "Alberta Labor Market Context",
+    "lastUpdated": "Last Updated",
+    "keySectors": "Key Occupations",
+    "important": "Important Information",
+    "contextNote": "This labor market information provides general context about employment trends in Alberta. It does NOT guarantee AAIP nomination outcomes.",
+    "updateSchedule": "This page is manually updated quarterly based on Alberta economic reports and government publications. For the most accurate AAIP information, refer to the official"
   }
 }

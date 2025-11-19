@@ -1,249 +1,236 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BriefcaseIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  ArrowPathIcon,
-  ChartBarIcon
+  MinusIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';
+import AlbertaEconomyIndicators from './AlbertaEconomyIndicators';
+import ExpressEntryComparison from './ExpressEntryComparison';
 
 const LaborMarketInsights = () => {
-  const { t } = useTranslation();
-  const [insights, setInsights] = useState([]);
-  const [occupations, setOccupations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { t, i18n } = useTranslation();
 
-  useEffect(() => {
-    fetchData();
-    // Refresh every 12 hours (labor market data doesn't change frequently)
-    const interval = setInterval(fetchData, 12 * 60 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [insightsRes, occupationsRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/job-bank/insights`),
-        fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/api/job-bank/occupations`)
-      ]);
-
-      if (insightsRes.ok) {
-        const insightsData = await insightsRes.json();
-        setInsights(insightsData);
+  // Manually curated labor market context (update quarterly)
+  const laborMarketData = {
+    lastUpdated: '2025-Q4',
+    updateDate: 'November 2025',
+    
+    streams: [
+      {
+        name: 'Healthcare (DHCP)',
+        nameZh: '医疗保健途径',
+        demand: 'strong',
+        trend: 'up',
+        summary: 'Alberta continues to face healthcare worker shortages. Strong demand for nurses, healthcare aides, and allied health professionals.',
+        summaryZh: '阿尔伯塔省持续面临医疗工作者短缺。对护士、医疗助理和相关健康专业人员有强劲需求。',
+        recommendation: 'Excellent time for healthcare workers to apply. DHCP remains highly active.',
+        recommendationZh: '医疗保健工作者申请的绝佳时机。DHCP保持高度活跃。',
+        sectors: ['Registered Nurses', 'Licensed Practical Nurse', 'Healthcare Aides', 'Medical Lab Technologists'],
+        sectorsZh: ['注册护士', '执业护士', '医疗助理', '医学实验室技术人员']
+      },
+      {
+        name: 'Tourism & Hospitality',
+        nameZh: '旅游与酒店业',
+        demand: 'moderate',
+        trend: 'stable',
+        summary: 'Hospitality sector recovering post-pandemic. Seasonal demand for cooks, food service workers, and hotel staff.',
+        summaryZh: '酒店业疫情后恢复中。对厨师、餐饮服务人员和酒店员工有季节性需求。',
+        recommendation: 'Good opportunities exist, especially in Calgary and Banff area. Competition is moderate.',
+        recommendationZh: '有良好机会，特别是在卡尔加里和班夫地区。竞争适中。',
+        sectors: ['Cooks', 'Food Service Supervisors', 'Hotel Front Desk', 'Restaurant Managers'],
+        sectorsZh: ['厨师', '餐饮服务主管', '酒店前台', '餐厅经理']
+      },
+      {
+        name: 'Technology (Accelerated Tech)',
+        nameZh: '科技加速通道',
+        demand: 'moderate',
+        trend: 'down',
+        summary: 'Tech sector consolidating after recent growth. Selective hiring focused on experienced professionals.',
+        summaryZh: '科技行业在近期增长后进行整合。有选择地聘用有经验的专业人士。',
+        recommendation: 'Competitive. Strong credentials and work experience recommended. AI/ML skills are valued.',
+        recommendationZh: '竞争激烈。建议有强大资历和工作经验。AI/ML技能受重视。',
+        sectors: ['Software Engineers', 'Data Scientists', 'DevOps Engineers', 'Cybersecurity'],
+        sectorsZh: ['软件工程师', '数据科学家', 'DevOps工程师', '网络安全']
+      },
+      {
+        name: 'Construction & Trades',
+        nameZh: '建筑与技工',
+        demand: 'strong',
+        trend: 'up',
+        summary: 'Infrastructure projects and housing development driving demand for skilled trades. Electricians, plumbers, and carpenters in high demand.',
+        summaryZh: '基础设施项目和住房开发推动对技术工人的需求。电工、水管工和木工需求旺盛。',
+        recommendation: 'Strong opportunities through Alberta Opportunity Stream for certified tradespeople.',
+        recommendationZh: '持证技工通过阿尔伯塔机会类别有强劲机会。',
+        sectors: ['Electricians', 'Plumbers', 'Carpenters', 'Welders'],
+        sectorsZh: ['电工', '水管工', '木工', '焊工']
+      },
+      {
+        name: 'Agriculture & Rural',
+        nameZh: '农业与乡村',
+        demand: 'moderate',
+        trend: 'stable',
+        summary: 'Steady demand in rural areas. Farm workers, meat processing, and agricultural managers needed.',
+        summaryZh: '农村地区需求稳定。需要农场工人、肉类加工和农业管理人员。',
+        recommendation: 'Consider Rural Renewal Stream if working outside major cities. Lower competition.',
+        recommendationZh: '如在主要城市外工作，可考虑农村振兴类别。竞争较低。',
+        sectors: ['Farm Supervisors', 'Agricultural Workers', 'Meat Cutters', 'Food Processing'],
+        sectorsZh: ['农场主管', '农业工人', '切肉工', '食品加工']
+      },
+      {
+        name: 'General Business & Services',
+        nameZh: '一般商业与服务',
+        demand: 'moderate',
+        trend: 'stable',
+        summary: 'Diverse opportunities in retail, transportation, and services. Broad eligibility through AOS.',
+        summaryZh: '零售、运输和服务领域机会多样。通过AOS资格广泛。',
+        recommendation: 'Accessible for many occupations. Focus on gaining Alberta work experience.',
+        recommendationZh: '许多职业都可申请。重点是获得阿尔伯塔工作经验。',
+        sectors: ['Retail Supervisors', 'Truck Drivers', 'Administrative Assistants', 'Customer Service'],
+        sectorsZh: ['零售主管', '卡车司机', '行政助理', '客户服务']
       }
+    ],
+    
+    generalContext: {
+      title: 'Alberta Economic Outlook',
+      titleZh: '阿尔伯塔省经济展望',
+      summary: "Alberta's economy remains robust with continued investment in energy, technology, and infrastructure. Population growth is driving demand across multiple sectors. The provincial government is actively working to address labor shortages through immigration programs.",
+      summaryZh: '阿尔伯塔省经济保持强劲，能源、技术和基础设施领域持续投资。人口增长推动多个行业需求。省政府正积极通过移民项目解决劳动力短缺问题。'
+    }
+  };
 
-      if (occupationsRes.ok) {
-        const occupationsData = await occupationsRes.json();
-        setOccupations(occupationsData);
+  const getDemandBadge = (demand) => {
+    const badges = {
+      strong: {
+        color: 'bg-green-100 text-green-800 border-green-300',
+        icon: <CheckCircleIcon className="h-4 w-4" />,
+        text: 'Strong Demand',
+        textZh: '需求旺盛'
+      },
+      moderate: {
+        color: 'bg-blue-100 text-blue-800 border-blue-300',
+        icon: <InformationCircleIcon className="h-4 w-4" />,
+        text: 'Moderate Demand',
+        textZh: '需求适中'
+      },
+      declining: {
+        color: 'bg-amber-100 text-amber-800 border-amber-300',
+        icon: <ExclamationTriangleIcon className="h-4 w-4" />,
+        text: 'Competitive',
+        textZh: '竞争激烈'
       }
-
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching labor market data:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getInsightIcon = (type) => {
-    switch (type) {
-      case 'growth':
-        return <ArrowTrendingUpIcon className="h-6 w-6 text-green-500" />;
-      case 'decline':
-        return <ArrowTrendingDownIcon className="h-6 w-6 text-red-500" />;
-      case 'high_demand':
-        return <ChartBarIcon className="h-6 w-6 text-blue-500" />;
-      default:
-        return <ArrowPathIcon className="h-6 w-6 text-gray-500" />;
-    }
-  };
-
-  const getInsightColor = (type) => {
-    switch (type) {
-      case 'growth':
-      case 'high_demand':
-        return 'bg-green-50 border-green-200';
-      case 'decline':
-        return 'bg-amber-50 border-amber-200';
-      default:
-        return 'bg-blue-50 border-blue-200';
-    }
-  };
-
-  const getOutlookBadge = (outlook) => {
-    const colors = {
-      'Good': 'bg-green-100 text-green-800 border-green-300',
-      'Fair': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      'Limited': 'bg-red-100 text-red-800 border-red-300'
     };
-    return colors[outlook] || 'bg-gray-100 text-gray-800 border-gray-300';
+    return badges[demand] || badges.moderate;
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <BriefcaseIcon className="h-6 w-6 text-indigo-600" />
-          <h2 className="text-xl font-bold">{t('laborMarket.title', 'Labor Market Insights')}</h2>
-        </div>
-        <div className="animate-pulse space-y-4">
-          <div className="h-24 bg-gray-200 rounded"></div>
-          <div className="h-24 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <BriefcaseIcon className="h-6 w-6 text-indigo-600" />
-          <h2 className="text-xl font-bold">{t('laborMarket.title', 'Labor Market Insights')}</h2>
-        </div>
-        <p className="text-red-500">{t('laborMarket.error', 'Failed to load labor market data')}</p>
-      </div>
-    );
-  }
-
-  const noData = insights.length === 0 && occupations.length === 0;
-
-  if (noData) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <BriefcaseIcon className="h-6 w-6 text-indigo-600" />
-          <h2 className="text-xl font-bold">{t('laborMarket.title', 'Labor Market Insights')}</h2>
-        </div>
-        <div className="text-center py-8">
-          <BriefcaseIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-          <p className="text-gray-600">
-            {t('laborMarket.noData', 'Labor market data will be available after the first scraping run.')}
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            {t('laborMarket.dataSource', 'Data source: Job Bank Canada')}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const getTrendIcon = (trend) => {
+    if (trend === 'up') return <ArrowTrendingUpIcon className="h-5 w-5 text-green-600" />;
+    if (trend === 'down') return <ArrowTrendingDownIcon className="h-5 w-5 text-red-600" />;
+    return <MinusIcon className="h-5 w-5 text-gray-600" />;
+  };
 
   return (
     <div className="space-y-6">
-      {/* Labor Market Insights */}
-      {insights.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <BriefcaseIcon className="h-6 w-6 text-indigo-600" />
-            <h2 className="text-xl font-bold">
-              {t('laborMarket.insights', 'Labor Market Insights')}
-            </h2>
-            <span className="ml-auto text-sm text-gray-500">
-              {t('laborMarket.source', 'Based on Job Bank data')}
-            </span>
-          </div>
+      {/* Alberta Economic Indicators */}
+      <AlbertaEconomyIndicators />
 
-          <div className="space-y-4">
-            {insights.map((insight, index) => (
-              <div
-                key={index}
-                className={`border rounded-lg p-4 ${getInsightColor(insight.insight_type)}`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-1">
-                    {getInsightIcon(insight.insight_type)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-gray-900">
-                        {insight.stream_affected}
-                      </h3>
-                      <span className="px-2 py-1 bg-white bg-opacity-70 rounded text-xs font-medium text-gray-700">
-                        {insight.occupation_category}
-                      </span>
-                    </div>
-                    <p className="text-gray-800 mb-2">
-                      <strong>{t('laborMarket.trend', 'Trend')}:</strong> {insight.trend_description}
-                    </p>
-                    <p className="text-gray-700 text-sm mb-2">
-                      <strong>{t('laborMarket.impact', 'Impact')}:</strong> {insight.impact_analysis}
-                    </p>
-                    {insight.recommendation && (
-                      <div className="mt-2 p-2 bg-white bg-opacity-70 rounded border border-current border-opacity-20">
-                        <p className="text-sm font-medium text-gray-800">
-                          💡 {insight.recommendation}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+      {/* Express Entry Comparison */}
+      <ExpressEntryComparison />
+
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <BriefcaseIcon className="h-8 w-8 text-indigo-600" />
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {t('laborMarket.title', 'Alberta Labor Market Context')}
+            </h2>
+            <p className="text-sm text-gray-600">
+              {t('laborMarket.lastUpdated', 'Last Updated')}: {laborMarketData.updateDate}
+            </p>
           </div>
         </div>
-      )}
 
-      {/* Occupation Details */}
-      {occupations.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-bold mb-6">
-            {t('laborMarket.occupations', 'Tracked Occupations')}
-          </h2>
+        {/* General Context */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-semibold text-gray-900 mb-2">
+            {i18n.language === 'zh' ? laborMarketData.generalContext.titleZh : laborMarketData.generalContext.title}
+          </h3>
+          <p className="text-gray-700 text-sm">
+            {i18n.language === 'zh' ? laborMarketData.generalContext.summaryZh : laborMarketData.generalContext.summary}
+          </p>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {occupations.map((occ, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-gray-900 text-sm">{occ.occupation_title}</h3>
-                  {occ.outlook && (
-                    <span className={`px-2 py-1 rounded text-xs font-medium border ${getOutlookBadge(occ.outlook)}`}>
-                      {occ.outlook}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-gray-600 mb-3">NOC {occ.noc_code}</p>
-                
-                <div className="space-y-1 text-sm">
-                  {occ.job_openings !== null && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">{t('laborMarket.openings', 'Job Openings')}:</span>
-                      <span className="font-medium">{occ.job_openings.toLocaleString()}</span>
+      {/* Stream-by-Stream Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {laborMarketData.streams.map((stream, index) => {
+          const badge = getDemandBadge(stream.demand);
+          return (
+            <div key={index} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">
+                      {i18n.language === 'zh' ? stream.nameZh : stream.name}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
+                        {badge.icon}
+                        {i18n.language === 'zh' ? badge.textZh : badge.text}
+                      </span>
+                      {getTrendIcon(stream.trend)}
                     </div>
-                  )}
-                  {occ.job_seekers !== null && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">{t('laborMarket.seekers', 'Job Seekers')}:</span>
-                      <span className="font-medium">{occ.job_seekers.toLocaleString()}</span>
-                    </div>
-                  )}
-                  {occ.median_wage !== null && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">{t('laborMarket.wage', 'Median Wage')}:</span>
-                      <span className="font-medium">${occ.median_wage.toFixed(2)}/hr</span>
-                    </div>
-                  )}
+                  </div>
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-indigo-600 font-medium">
-                    {t('laborMarket.relatedTo', 'Related to')}: {occ.aaip_stream}
+                {/* Summary */}
+                <p className="text-gray-700 text-sm mb-4">
+                  {i18n.language === 'zh' ? stream.summaryZh : stream.summary}
+                </p>
+
+                {/* Key Sectors */}
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">
+                    {t('laborMarket.keySectors', 'Key Occupations')}:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(i18n.language === 'zh' ? stream.sectorsZh : stream.sectors).map((sector, idx) => (
+                      <span key={idx} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                        {sector}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recommendation */}
+                <div className="bg-indigo-50 border-l-4 border-indigo-400 p-3 rounded">
+                  <p className="text-sm font-medium text-gray-800">
+                    💡 {i18n.language === 'zh' ? stream.recommendationZh : stream.recommendation}
                   </p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
 
-      {/* Disclaimer */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-gray-700">
-        <p className="font-medium mb-1">ℹ️ {t('laborMarket.about', 'About This Data')}</p>
-        <p>
-          {t('laborMarket.disclaimer', 'Labor market data is sourced from Job Bank Canada and reflects general employment trends in Alberta. This data provides context for understanding AAIP stream priorities but does not guarantee nomination outcomes.')}
+      {/* Important Disclaimer */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+          <InformationCircleIcon className="h-5 w-5 text-amber-600" />
+          {t('laborMarket.important', 'Important Information')}
+        </h3>
+        <p className="text-gray-700 text-sm mb-2">
+          {t('laborMarket.contextNote', 'This labor market information provides general context about employment trends in Alberta. It does NOT guarantee AAIP nomination outcomes.')}
+        </p>
+        <p className="text-gray-700 text-sm">
+          {t('laborMarket.updateSchedule', 'This page is manually updated quarterly based on Alberta economic reports and government publications. For the most accurate AAIP information, refer to the official')} <a href="https://www.alberta.ca/aaip" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline font-medium">Alberta.ca AAIP page</a>.
         </p>
       </div>
     </div>

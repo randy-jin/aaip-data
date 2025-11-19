@@ -12,6 +12,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 import re
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -1791,6 +1792,366 @@ async def get_labor_market_insights():
         if "does not exist" in str(e):
             return []
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/labor-market/quarterly")
+async def get_quarterly_labor_market():
+    """
+    Get quarterly labor market context data for all streams
+    Returns the most recent quarterly update
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check if table exists
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'labor_market_quarterly'
+            )
+        """)
+        
+        if not cursor.fetchone()['exists']:
+            cursor.close()
+            conn.close()
+            return {
+                "quarter": None,
+                "update_date": None,
+                "streams": [],
+                "message": "No quarterly data available yet. Run quarterly collector first."
+            }
+        
+        # Get the latest quarter
+        cursor.execute("""
+            SELECT quarter, update_date
+            FROM labor_market_quarterly
+            ORDER BY generated_at DESC
+            LIMIT 1
+        """)
+        
+        latest = cursor.fetchone()
+        if not latest:
+            cursor.close()
+            conn.close()
+            return {
+                "quarter": None,
+                "update_date": None,
+                "streams": [],
+                "message": "No data available"
+            }
+        
+        # Get all streams for the latest quarter
+        cursor.execute("""
+            SELECT 
+                stream_name,
+                demand_level,
+                trend,
+                sectors,
+                noc_codes,
+                generated_at
+            FROM labor_market_quarterly
+            WHERE quarter = %s
+            ORDER BY stream_name
+        """, (latest['quarter'],))
+        
+        streams = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return {
+            "quarter": latest['quarter'],
+            "update_date": latest['update_date'],
+            "streams": [
+                {
+                    "name": s['stream_name'],
+                    "demand": s['demand_level'],
+                    "trend": s['trend'],
+                    "sectors": json.loads(s['sectors']) if s['sectors'] else [],
+                    "noc_codes": json.loads(s['noc_codes']) if s['noc_codes'] else []
+                }
+                for s in streams
+            ],
+            "generated_at": streams[0]['generated_at'].isoformat() if streams else None
+        }
+        
+    except Exception as e:
+        # Return empty data structure if any error
+        return {
+            "quarter": None,
+            "update_date": None,
+            "streams": [],
+            "error": str(e)
+        }
+
+
+@app.get("/api/alberta-economy/indicators")
+async def get_alberta_economy_indicators():
+    """
+    Get latest Alberta economic indicators
+    Returns current snapshot and recent trends
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check if table exists
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'alberta_economy'
+            )
+        """)
+        
+        if not cursor.fetchone()['exists']:
+            cursor.close()
+            conn.close()
+            return {
+                "current": None,
+                "trends": [],
+                "message": "No economic data available yet. Run alberta_economy_collector.py first."
+            }
+        
+        # Get latest data point
+        cursor.execute("""
+            SELECT 
+                timestamp,
+                unemployment_rate,
+                gdp_growth,
+                population_growth,
+                oil_price,
+                oil_price_trend,
+                insights
+            FROM alberta_economy
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """)
+        
+        latest = cursor.fetchone()
+        
+        if not latest:
+            cursor.close()
+            conn.close()
+            return {
+                "current": None,
+                "trends": [],
+                "message": "No data available"
+            }
+        
+        # Get historical data for trends (last 6 months)
+        cursor.execute("""
+            SELECT 
+                timestamp,
+                unemployment_rate,
+                gdp_growth,
+                population_growth,
+                oil_price
+            FROM alberta_economy
+            WHERE timestamp >= CURRENT_DATE - INTERVAL '6 months'
+            ORDER BY timestamp ASC
+        """)
+        
+        trends = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return {
+            "current": {
+                "timestamp": latest['timestamp'].isoformat(),
+                "unemployment_rate": float(latest['unemployment_rate']) if latest['unemployment_rate'] else None,
+                "gdp_growth": float(latest['gdp_growth']) if latest['gdp_growth'] else None,
+                "population_growth": float(latest['population_growth']) if latest['population_growth'] else None,
+                "oil_price": float(latest['oil_price']) if latest['oil_price'] else None,
+                "oil_price_trend": latest['oil_price_trend'],
+                "insights": latest['insights'] if latest['insights'] else []
+            },
+            "trends": [
+                {
+                    "timestamp": t['timestamp'].isoformat(),
+                    "unemployment_rate": float(t['unemployment_rate']) if t['unemployment_rate'] else None,
+                    "gdp_growth": float(t['gdp_growth']) if t['gdp_growth'] else None,
+                    "population_growth": float(t['population_growth']) if t['population_growth'] else None,
+                    "oil_price": float(t['oil_price']) if t['oil_price'] else None
+                }
+                for t in trends
+            ]
+        }
+        
+    except Exception as e:
+        # Return empty data structure if any error
+        return {
+            "current": None,
+            "trends": [],
+            "error": str(e)
+        }
+
+
+@app.get("/api/express-entry/comparison")
+async def get_express_entry_comparison():
+    """
+    Get Express Entry vs AAIP comparison data
+    Returns latest EE draws and comparison insights
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check if table exists
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'express_entry_draws'
+            )
+        """)
+        
+        if not cursor.fetchone()['exists']:
+            cursor.close()
+            conn.close()
+            return {
+                "express_entry": [],
+                "aaip": [],
+                "comparison": None,
+                "message": "No Express Entry data available. Run express_entry_collector.py first."
+            }
+        
+        # Get latest EE draws (separate PNP and general)
+        cursor.execute("""
+            SELECT 
+                draw_date,
+                draw_number,
+                program,
+                invitations_issued,
+                crs_cutoff
+            FROM express_entry_draws
+            ORDER BY draw_date DESC
+            LIMIT 20
+        """)
+        
+        ee_draws = cursor.fetchall()
+        
+        # Get latest AAIP draws for comparison
+        cursor.execute("""
+            SELECT 
+                draw_date,
+                stream_category,
+                min_score as crs_score,
+                invitations_issued
+            FROM aaip_draws
+            ORDER BY draw_date DESC
+            LIMIT 10
+        """)
+        
+        aaip_draws = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        # Separate EE draws by type
+        pnp_draws = [d for d in ee_draws if 'Provincial' in d['program']]
+        general_draws = [d for d in ee_draws if 'Provincial' not in d['program']]
+        
+        # Calculate averages
+        comparison = {}
+        
+        if pnp_draws:
+            pnp_scores = [d['crs_cutoff'] for d in pnp_draws]
+            comparison['ee_pnp'] = {
+                'avg_crs': round(sum(pnp_scores) / len(pnp_scores), 1),
+                'min_crs': min(pnp_scores),
+                'max_crs': max(pnp_scores),
+                'latest_crs': pnp_draws[0]['crs_cutoff'],
+                'draw_count': len(pnp_draws)
+            }
+        
+        if general_draws:
+            general_scores = [d['crs_cutoff'] for d in general_draws]
+            comparison['ee_general'] = {
+                'avg_crs': round(sum(general_scores) / len(general_scores), 1),
+                'min_crs': min(general_scores),
+                'max_crs': max(general_scores),
+                'latest_crs': general_draws[0]['crs_cutoff'],
+                'draw_count': len(general_draws)
+            }
+        
+        if aaip_draws:
+            aaip_scores = [d['crs_score'] for d in aaip_draws if d['crs_score']]
+            if aaip_scores:
+                comparison['aaip'] = {
+                    'avg_crs': round(sum(aaip_scores) / len(aaip_scores), 1),
+                    'min_crs': min(aaip_scores),
+                    'max_crs': max(aaip_scores),
+                    'latest_crs': aaip_draws[0]['crs_score'] if aaip_draws[0]['crs_score'] else None,
+                    'draw_count': len(aaip_draws)
+                }
+        
+        # Generate insights
+        insights = []
+        
+        if comparison.get('ee_pnp') and comparison.get('aaip'):
+            score_diff = comparison['ee_pnp']['avg_crs'] - comparison['aaip']['avg_crs']
+            if score_diff > 200:
+                insights.append({
+                    'type': 'advantage',
+                    'category': 'CRS Requirements',
+                    'message': f"AAIP typically requires ~{abs(score_diff):.0f} fewer CRS points than federal PNP draws",
+                    'advantage': 'AAIP'
+                })
+        
+        insights.append({
+            'type': 'benefit',
+            'category': 'Provincial Nomination',
+            'message': 'AAIP nomination adds 600 CRS points, virtually guaranteeing federal ITA',
+            'advantage': 'AAIP'
+        })
+        
+        insights.append({
+            'type': 'info',
+            'category': 'Processing Path',
+            'message': 'AAIP: Provincial approval → Federal PR. Direct EE: Single federal process',
+            'advantage': 'different'
+        })
+        
+        return {
+            "express_entry": {
+                "pnp": [
+                    {
+                        "date": d['draw_date'].isoformat(),
+                        "number": d['draw_number'],
+                        "crs": d['crs_cutoff'],
+                        "invitations": d['invitations_issued']
+                    }
+                    for d in pnp_draws[:5]
+                ],
+                "general": [
+                    {
+                        "date": d['draw_date'].isoformat(),
+                        "number": d['draw_number'],
+                        "crs": d['crs_cutoff'],
+                        "invitations": d['invitations_issued']
+                    }
+                    for d in general_draws[:5]
+                ]
+            },
+            "aaip": [
+                {
+                    "date": d['draw_date'].isoformat() if d['draw_date'] else None,
+                    "stream": d['stream_category'],
+                    "crs": d['crs_score'],
+                    "invitations": d['invitations_issued']
+                }
+                for d in aaip_draws[:5]
+            ],
+            "comparison": comparison,
+            "insights": insights
+        }
+        
+    except Exception as e:
+        return {
+            "express_entry": [],
+            "aaip": [],
+            "comparison": None,
+            "error": str(e)
+        }
 
 
 if __name__ == "__main__":
