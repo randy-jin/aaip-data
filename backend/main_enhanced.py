@@ -2154,6 +2154,380 @@ async def get_express_entry_comparison():
         }
 
 
+@app.get("/api/trends/analysis")
+async def get_trend_analysis():
+    """
+    Get comprehensive historical trend analysis
+    Returns draw frequency, CRS trends, seasonal patterns, and success probabilities
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Check if trend analysis exists
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'trend_analysis'
+            )
+        """)
+        
+        if not cursor.fetchone()['exists']:
+            cursor.close()
+            conn.close()
+            return {
+                "message": "No trend analysis available. Run trend_analysis_engine.py first.",
+                "data": None
+            }
+        
+        # Get latest trend analysis
+        cursor.execute("""
+            SELECT report_data, analysis_date, created_at
+            FROM trend_analysis
+            ORDER BY analysis_date DESC
+            LIMIT 1
+        """)
+        
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not result:
+            return {
+                "message": "No trend analysis data found",
+                "data": None
+            }
+        
+        return {
+            "analysis_date": result['analysis_date'].isoformat(),
+            "last_updated": result['created_at'].isoformat(),
+            "data": result['report_data']
+        }
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "data": None
+        }
+
+
+@app.get("/api/trends/prediction")
+async def get_draw_prediction():
+    """
+    Predict next draw date and CRS range based on historical patterns
+    Note: This is an ESTIMATE based on patterns, not a guarantee
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Get latest draws per stream
+        cursor.execute("""
+            SELECT DISTINCT ON (stream_category)
+                stream_category,
+                draw_date,
+                min_score,
+                invitations_issued
+            FROM aaip_draws
+            WHERE draw_date IS NOT NULL
+            ORDER BY stream_category, draw_date DESC
+        """)
+        
+        latest_draws = cursor.fetchall()
+        
+        # Get trend analysis for frequency data
+        cursor.execute("""
+            SELECT report_data
+            FROM trend_analysis
+            ORDER BY analysis_date DESC
+            LIMIT 1
+        """)
+        
+        trend_result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not trend_result:
+            return {
+                "message": "Trend analysis required. Run trend_analysis_engine.py first.",
+                "predictions": []
+            }
+        
+        trend_data = trend_result['report_data']
+        frequency_data = trend_data.get('draw_frequency', {})
+        crs_trends = trend_data.get('crs_trends', {})
+        
+        predictions = []
+        
+        for draw in latest_draws:
+            stream = draw['stream_category']
+            last_date = draw['draw_date']
+            
+            freq = frequency_data.get(stream, {})
+            crs_trend = crs_trends.get(stream, {})
+            
+            if freq.get('avg_days'):
+                # Predict next draw date
+                avg_days = freq['avg_days']
+                next_date = last_date + timedelta(days=int(avg_days))
+                
+                # CRS prediction range (conservative)
+                recent_avg = crs_trend.get('recent_avg')
+                recent_min = crs_trend.get('recent_min')
+                recent_max = crs_trend.get('recent_max')
+                
+                prediction = {
+                    'stream': stream,
+                    'last_draw_date': last_date.isoformat(),
+                    'predicted_next_draw': next_date.isoformat(),
+                    'confidence': 'Low to Moderate' if avg_days > 30 else 'Moderate',
+                    'days_from_last': int(avg_days),
+                    'crs_prediction': {
+                        'expected_range': f"{recent_min}-{recent_max}" if recent_min and recent_max else None,
+                        'recent_avg': recent_avg,
+                        'trend': crs_trend.get('trend', 'unknown')
+                    },
+                    'disclaimer': 'Based on historical patterns. Immigration policy can change unexpectedly.'
+                }
+                
+                predictions.append(prediction)
+        
+        return {
+            "generated_at": datetime.now().isoformat(),
+            "predictions": predictions,
+            "important_notice": "These are statistical estimates based on past patterns, not official predictions. AAIP draw schedules can change based on government priorities and policy updates."
+        }
+        
+    except Exception as e:
+        return {
+            "error": str(e),
+            "predictions": []
+        }
+
+
+# ==============================================
+# SUCCESS STORIES ENDPOINTS
+# ==============================================
+
+class SuccessStorySubmit(BaseModel):
+    story_type: str  # 'nomination', 'pr_approval', 'job_offer', 'settlement'
+    aaip_stream: str
+    timeline_submitted: Optional[str] = None
+    timeline_nominated: Optional[str] = None
+    timeline_pr_approved: Optional[str] = None
+    noc_code: Optional[str] = None
+    crs_score: Optional[int] = None
+    work_permit_type: Optional[str] = None
+    city: Optional[str] = None
+    story_text: str
+    tips: Optional[str] = None
+    challenges: Optional[str] = None
+    author_name: Optional[str] = "Anonymous"
+    is_anonymous: bool = True
+    email: Optional[str] = None
+
+
+@app.get("/api/success-stories")
+async def get_success_stories(
+    stream: Optional[str] = None,
+    story_type: Optional[str] = None,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0)
+):
+    """Get approved success stories from community members"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        query = """
+            SELECT 
+                id, story_type, aaip_stream, timeline_submitted, timeline_nominated,
+                timeline_pr_approved, noc_code, crs_score, work_permit_type, city,
+                story_text, tips, challenges,
+                CASE WHEN is_anonymous THEN 'Anonymous' ELSE author_name END as author_name,
+                helpful_count, created_at, approved_at
+            FROM success_stories
+            WHERE status = 'approved'
+        """
+        params = []
+        param_count = 1
+        
+        if stream:
+            query += f" AND aaip_stream = ${param_count}"
+            params.append(stream)
+            param_count += 1
+            
+        if story_type:
+            query += f" AND story_type = ${param_count}"
+            params.append(story_type)
+            param_count += 1
+        
+        query += f" ORDER BY approved_at DESC LIMIT ${param_count} OFFSET ${param_count + 1}"
+        params.extend([limit, offset])
+        
+        cursor.execute(query, params)
+        stories = cursor.fetchall()
+        
+        # Get total count
+        count_query = "SELECT COUNT(*) as total FROM success_stories WHERE status = 'approved'"
+        count_params = []
+        if stream:
+            count_query += " AND aaip_stream = %s"
+            count_params.append(stream)
+        if story_type:
+            count_query += " AND story_type = %s"
+            count_params.append(story_type)
+            
+        cursor.execute(count_query, count_params)
+        total = cursor.fetchone()['total']
+        
+        cursor.close()
+        conn.close()
+        
+        # Convert dates to strings
+        for story in stories:
+            for date_field in ['timeline_submitted', 'timeline_nominated', 'timeline_pr_approved', 'created_at', 'approved_at']:
+                if story.get(date_field):
+                    story[date_field] = story[date_field].isoformat()
+        
+        return {
+            "stories": stories,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch success stories: {str(e)}")
+
+
+@app.post("/api/success-stories")
+async def submit_success_story(story: SuccessStorySubmit):
+    """Submit a new success story (auto-approved for now)"""
+    try:
+        # Validation
+        if not story.story_text or len(story.story_text) < 50:
+            raise HTTPException(status_code=400, detail="Story text must be at least 50 characters")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            INSERT INTO success_stories (
+                story_type, aaip_stream, timeline_submitted, timeline_nominated,
+                timeline_pr_approved, noc_code, crs_score, work_permit_type, city,
+                story_text, tips, challenges, author_name, is_anonymous, email, status,
+                approved_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'approved', NOW())
+            RETURNING id
+        """, (
+            story.story_type, story.aaip_stream, story.timeline_submitted, 
+            story.timeline_nominated, story.timeline_pr_approved, story.noc_code,
+            story.crs_score, story.work_permit_type, story.city, story.story_text,
+            story.tips, story.challenges, story.author_name, story.is_anonymous, story.email
+        ))
+        
+        result = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {
+            "message": "Success story submitted and approved!",
+            "id": result['id']
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit story: {str(e)}")
+
+
+@app.post("/api/success-stories/{story_id}/helpful")
+async def mark_story_helpful(story_id: int):
+    """Mark a story as helpful"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Increment helpful count
+        cursor.execute("""
+            UPDATE success_stories 
+            SET helpful_count = helpful_count + 1 
+            WHERE id = %s 
+            RETURNING helpful_count
+        """, (story_id,))
+        
+        result = cursor.fetchone()
+        
+        if not result:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail="Story not found")
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return {"helpful_count": result['helpful_count']}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to mark as helpful: {str(e)}")
+
+
+@app.get("/api/success-stories/stats")
+async def get_success_stories_stats():
+    """Get statistics about success stories"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Overall stats
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_stories,
+                COUNT(DISTINCT aaip_stream) as streams_covered,
+                AVG(
+                    CASE 
+                        WHEN timeline_nominated IS NOT NULL AND timeline_submitted IS NOT NULL 
+                        THEN EXTRACT(DAY FROM (timeline_nominated - timeline_submitted))
+                    END
+                ) as avg_days_to_nomination,
+                AVG(
+                    CASE 
+                        WHEN timeline_pr_approved IS NOT NULL AND timeline_nominated IS NOT NULL 
+                        THEN EXTRACT(DAY FROM (timeline_pr_approved - timeline_nominated))
+                    END
+                ) as avg_days_to_pr
+            FROM success_stories
+            WHERE status = 'approved'
+        """)
+        
+        overall = cursor.fetchone()
+        
+        # By stream
+        cursor.execute("""
+            SELECT aaip_stream, COUNT(*) as count
+            FROM success_stories
+            WHERE status = 'approved'
+            GROUP BY aaip_stream
+            ORDER BY count DESC
+        """)
+        
+        by_stream = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        return {
+            "overall": overall,
+            "by_stream": by_stream
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     from datetime import timedelta

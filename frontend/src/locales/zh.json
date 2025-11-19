@@ -24,7 +24,9 @@
     "eoiPool": "意向池",
     "insights": "智能洞察",
     "tools": "规划工具",
-    "laborMarket": "劳动力市场"
+    "laborMarket": "劳动力市场",
+    "predictions": "趋势预测",
+    "community": "成功案例"
   },
   "draws": {
     "filters": "筛选抽签数据",

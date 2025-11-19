@@ -1,0 +1,239 @@
+{
+  "metadata": {
+    "generated_at": "2025-11-19T10:11:33.679138",
+    "total_draws": 73,
+    "date_range": {
+      "earliest": "2025-02-03",
+      "latest": "2025-10-29"
+    }
+  },
+  "draw_frequency": {
+    "Rural Renewal Stream": {
+      "avg_days": 91,
+      "median_days": 91,
+      "min_days": 91,
+      "max_days": 91,
+      "total_draws": 2,
+      "most_recent": "2025-05-05"
+    },
+    "Dedicated Health Care Pathway": {
+      "avg_days": 13.1,
+      "median_days": 7.5,
+      "min_days": 1,
+      "max_days": 35,
+      "total_draws": 21,
+      "most_recent": "2025-10-24"
+    },
+    "Alberta Express Entry Stream": {
+      "avg_days": 7.5,
+      "median_days": 6,
+      "min_days": 1,
+      "max_days": 28,
+      "total_draws": 36,
+      "most_recent": "2025-10-29"
+    },
+    "Alberta Opportunity Stream": {
+      "avg_days": 25.1,
+      "median_days": 22.5,
+      "min_days": 8,
+      "max_days": 38,
+      "total_draws": 11,
+      "most_recent": "2025-10-23"
+    },
+    "Tourism and Hospitality Stream": {
+      "avg_days": 31.5,
+      "median_days": 31.5,
+      "min_days": 30,
+      "max_days": 33,
+      "total_draws": 3,
+      "most_recent": "2025-06-17"
+    }
+  },
+  "crs_trends": {
+    "Dedicated Health Care Pathway": {
+      "recent_avg": 46.4,
+      "recent_min": 42,
+      "recent_max": 52,
+      "trend": "decreasing",
+      "data_points": 21,
+      "all_time_min": 42,
+      "all_time_max": 62
+    },
+    "Alberta Express Entry Stream": {
+      "recent_avg": 55.8,
+      "recent_min": 46,
+      "recent_max": 67,
+      "trend": "stable",
+      "data_points": 36,
+      "all_time_min": 45,
+      "all_time_max": 73
+    },
+    "Alberta Opportunity Stream": {
+      "recent_avg": 62,
+      "recent_min": 56,
+      "recent_max": 70,
+      "trend": "stable",
+      "data_points": 11,
+      "all_time_min": 52,
+      "all_time_max": 77
+    },
+    "Tourism and Hospitality Stream": {
+      "recent_avg": 72,
+      "recent_min": 71,
+      "recent_max": 73,
+      "trend": "stable",
+      "data_points": 3,
+      "all_time_min": 71,
+      "all_time_max": 73
+    }
+  },
+  "seasonal_patterns": {
+    "by_month": {
+      "2": 10,
+      "3": 3,
+      "4": 9,
+      "5": 9,
+      "6": 8,
+      "7": 8,
+      "8": 4,
+      "9": 10,
+      "10": 12
+    },
+    "by_quarter": {
+      "1": 13,
+      "2": 26,
+      "3": 22,
+      "4": 12
+    },
+    "most_active_month": {
+      "month": "October",
+      "count": 12
+    },
+    "most_active_quarter": {
+      "quarter": "Q2",
+      "count": 26
+    }
+  },
+  "invitation_trends": {
+    "Rural Renewal Stream": {
+      "recent_avg": 178,
+      "recent_total": 355,
+      "all_time_avg": 178,
+      "all_time_total": 355,
+      "min_issued": 165,
+      "max_issued": 190
+    },
+    "Dedicated Health Care Pathway": {
+      "recent_avg": 84,
+      "recent_total": 422,
+      "all_time_avg": 47,
+      "all_time_total": 984,
+      "min_issued": 9,
+      "max_issued": 142
+    },
+    "Alberta Express Entry Stream": {
+      "recent_avg": 36,
+      "recent_total": 181,
+      "all_time_avg": 44,
+      "all_time_total": 1571,
+      "min_issued": 9,
+      "max_issued": 320
+    },
+    "Alberta Opportunity Stream": {
+      "recent_avg": 898,
+      "recent_total": 4488,
+      "all_time_avg": 474,
+      "all_time_total": 5212,
+      "min_issued": 16,
+      "max_issued": 1113
+    },
+    "Tourism and Hospitality Stream": {
+      "recent_avg": 35,
+      "recent_total": 105,
+      "all_time_avg": 35,
+      "all_time_total": 105,
+      "min_issued": 33,
+      "max_issued": 39
+    }
+  },
+  "success_probabilities": {
+    "Dedicated Health Care Pathway": {
+      "by_range": {
+        "0-300": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "301-400": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "401-500": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "501-600": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "601+": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        }
+      },
+      "median_cutoff": 52,
+      "recent_cutoff": 42
+    },
+    "Alberta Express Entry Stream": {
+      "by_range": {
+        "0-300": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "301-400": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "401-500": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "501-600": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "601+": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        }
+      },
+      "median_cutoff": 60.5,
+      "recent_cutoff": 46
+    },
+    "Alberta Opportunity Stream": {
+      "by_range": {
+        "0-300": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "301-400": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "401-500": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "501-600": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        },
+        "601+": {
+          "probability": 100.0,
+          "interpretation": "Very High"
+        }
+      },
+      "median_cutoff": 61,
+      "recent_cutoff": 60
+    }
+  }
+}

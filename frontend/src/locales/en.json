@@ -24,7 +24,9 @@
     "eoiPool": "EOI Pool",
     "insights": "Smart Insights",
     "tools": "Planning Tools",
-    "laborMarket": "Labor Market"
+    "laborMarket": "Labor Market",
+    "predictions": "Trend Predictions",
+    "community": "Success Stories"
   },
   "draws": {
     "filters": "Filter Draw Data",
