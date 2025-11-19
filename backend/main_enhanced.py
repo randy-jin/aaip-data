@@ -793,6 +793,29 @@ class CompetitivenessScore(BaseModel):
     recommendation: str
 
 
+# Job Bank labor market data models
+class JobBankOccupation(BaseModel):
+    noc_code: str
+    occupation_title: str
+    outlook: Optional[str]  # 'Good', 'Fair', 'Limited'
+    job_openings: Optional[int]
+    job_seekers: Optional[int]
+    median_wage: Optional[float]
+    outlook_description: Optional[str]
+    aaip_stream: str
+    timestamp: str
+
+
+class LaborMarketInsight(BaseModel):
+    insight_type: str  # 'growth', 'decline', 'stable', 'high_demand'
+    stream_affected: str
+    occupation_category: str
+    trend_description: str
+    impact_analysis: str
+    recommendation: Optional[str]
+    generated_at: str
+
+
 @app.get("/api/eoi/latest", response_model=List[EOIPool])
 async def get_latest_eoi_pool():
     """Get the most recent EOI pool data for all streams"""
@@ -1547,6 +1570,226 @@ async def get_stream_competitiveness():
         return results
 
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Phase 2.1: Job Bank Labor Market Data Integration
+# ============================================================================
+
+@app.get("/api/job-bank/occupations", response_model=List[JobBankOccupation])
+async def get_job_bank_occupations(stream_name: Optional[str] = None):
+    """
+    Get latest Job Bank labor market data for occupations relevant to AAIP streams
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        where_clause = "AND aaip_stream = %s" if stream_name else ""
+        params = [stream_name] if stream_name else []
+        
+        cursor.execute(f"""
+            SELECT DISTINCT ON (noc_code)
+                noc_code,
+                occupation_title,
+                outlook,
+                job_openings,
+                job_seekers,
+                median_wage,
+                outlook_description,
+                aaip_stream,
+                timestamp
+            FROM job_bank_data
+            WHERE timestamp = (SELECT MAX(timestamp) FROM job_bank_data)
+            {where_clause}
+            ORDER BY noc_code, timestamp DESC
+        """, params)
+        
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        if not rows:
+            # Return empty list if no data yet
+            return []
+        
+        return [
+            JobBankOccupation(
+                noc_code=row['noc_code'],
+                occupation_title=row['occupation_title'],
+                outlook=row['outlook'],
+                job_openings=row['job_openings'],
+                job_seekers=row['job_seekers'],
+                median_wage=float(row['median_wage']) if row['median_wage'] else None,
+                outlook_description=row['outlook_description'],
+                aaip_stream=row['aaip_stream'],
+                timestamp=row['timestamp'].isoformat()
+            )
+            for row in rows
+        ]
+        
+    except Exception as e:
+        # If table doesn't exist yet, return empty list
+        if "does not exist" in str(e):
+            return []
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/job-bank/insights", response_model=List[LaborMarketInsight])
+async def get_labor_market_insights():
+    """
+    Generate insights by correlating Job Bank labor market data with AAIP streams
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        insights = []
+        current_time = datetime.now()
+        
+        # Check if table exists
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'job_bank_data'
+            )
+        """)
+        
+        if not cursor.fetchone()['exists']:
+            cursor.close()
+            conn.close()
+            return []
+        
+        # Get latest Job Bank data grouped by stream
+        cursor.execute("""
+            SELECT 
+                aaip_stream,
+                COUNT(*) as occupation_count,
+                AVG(CASE WHEN outlook = 'Good' THEN 1 
+                         WHEN outlook = 'Fair' THEN 0.5 
+                         ELSE 0 END) as avg_outlook_score,
+                SUM(job_openings) as total_openings,
+                SUM(job_seekers) as total_seekers,
+                STRING_AGG(occupation_title, ', ' ORDER BY job_openings DESC) as top_occupations
+            FROM job_bank_data
+            WHERE timestamp = (SELECT MAX(timestamp) FROM job_bank_data)
+            GROUP BY aaip_stream
+            HAVING COUNT(*) > 0
+        """)
+        
+        streams_data = cursor.fetchall()
+        
+        for stream in streams_data:
+            stream_name = stream['aaip_stream']
+            outlook_score = float(stream['avg_outlook_score']) if stream['avg_outlook_score'] else 0
+            openings = stream['total_openings'] or 0
+            seekers = stream['total_seekers'] or 1  # Avoid division by zero
+            
+            # Calculate supply/demand ratio
+            supply_demand_ratio = openings / seekers if seekers > 0 else 0
+            
+            # Generate insights based on data
+            if outlook_score > 0.7:  # Good outlook
+                insights.append({
+                    "insight_type": "high_demand",
+                    "stream_affected": stream_name,
+                    "occupation_category": "Multiple occupations",
+                    "trend_description": f"Labor market outlook is positive for {stream_name} occupations",
+                    "impact_analysis": f"With {openings} job openings and strong outlook, this stream may see continued demand for nominations.",
+                    "recommendation": "Good time to prepare applications for this stream if you have relevant experience.",
+                    "generated_at": current_time.isoformat()
+                })
+            elif supply_demand_ratio > 1.2:  # More openings than seekers
+                insights.append({
+                    "insight_type": "growth",
+                    "stream_affected": stream_name,
+                    "occupation_category": "Multiple occupations",
+                    "trend_description": f"Strong labor demand in {stream_name} related occupations",
+                    "impact_analysis": f"Job openings ({openings}) exceed job seekers ({seekers}), indicating labor shortage.",
+                    "recommendation": "Stream may prioritize these occupations in future draws.",
+                    "generated_at": current_time.isoformat()
+                })
+            elif supply_demand_ratio < 0.8 and seekers > 100:  # More seekers than openings
+                insights.append({
+                    "insight_type": "decline",
+                    "stream_affected": stream_name,
+                    "occupation_category": "Multiple occupations",
+                    "trend_description": f"Increased competition in {stream_name} labor market",
+                    "impact_analysis": f"Job seekers ({seekers}) outnumber openings ({openings}), suggesting higher competition.",
+                    "recommendation": "Consider strengthening your profile with additional qualifications.",
+                    "generated_at": current_time.isoformat()
+                })
+        
+        # Compare with previous period if available
+        cursor.execute("""
+            SELECT DISTINCT timestamp
+            FROM job_bank_data
+            ORDER BY timestamp DESC
+            LIMIT 2
+        """)
+        
+        timestamps = cursor.fetchall()
+        
+        if len(timestamps) >= 2:
+            # Trend analysis between two time periods
+            cursor.execute("""
+                WITH current_data AS (
+                    SELECT aaip_stream, SUM(job_openings) as openings
+                    FROM job_bank_data
+                    WHERE timestamp = %s
+                    GROUP BY aaip_stream
+                ),
+                previous_data AS (
+                    SELECT aaip_stream, SUM(job_openings) as openings
+                    FROM job_bank_data
+                    WHERE timestamp = %s
+                    GROUP BY aaip_stream
+                )
+                SELECT 
+                    c.aaip_stream,
+                    c.openings as current_openings,
+                    p.openings as previous_openings,
+                    ROUND(((c.openings - p.openings)::numeric / p.openings * 100), 1) as change_pct
+                FROM current_data c
+                JOIN previous_data p ON c.aaip_stream = p.aaip_stream
+                WHERE p.openings > 0
+                AND ABS((c.openings - p.openings)::numeric / p.openings) > 0.15
+            """, (timestamps[0]['timestamp'], timestamps[1]['timestamp']))
+            
+            trends = cursor.fetchall()
+            
+            for trend in trends:
+                change_pct = float(trend['change_pct'])
+                if change_pct > 15:
+                    insights.append({
+                        "insight_type": "growth",
+                        "stream_affected": trend['aaip_stream'],
+                        "occupation_category": "Tracked occupations",
+                        "trend_description": f"Job openings increased by {int(change_pct)}% in recent period",
+                        "impact_analysis": f"Growth from {trend['previous_openings']} to {trend['current_openings']} openings indicates expanding labor demand.",
+                        "recommendation": f"{trend['aaip_stream']} may see increased nomination activity.",
+                        "generated_at": current_time.isoformat()
+                    })
+                elif change_pct < -15:
+                    insights.append({
+                        "insight_type": "decline",
+                        "stream_affected": trend['aaip_stream'],
+                        "occupation_category": "Tracked occupations",
+                        "trend_description": f"Job openings decreased by {int(abs(change_pct))}% in recent period",
+                        "impact_analysis": f"Decline from {trend['previous_openings']} to {trend['current_openings']} openings may affect nomination priorities.",
+                        "recommendation": "Monitor for potential changes in draw frequency or eligibility.",
+                        "generated_at": current_time.isoformat()
+                    })
+        
+        cursor.close()
+        conn.close()
+        
+        return [LaborMarketInsight(**insight) for insight in insights]
+        
+    except Exception as e:
+        # Return empty list if any error (table not exists, etc.)
+        if "does not exist" in str(e):
+            return []
         raise HTTPException(status_code=500, detail=str(e))
 
 

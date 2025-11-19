@@ -23,7 +23,8 @@
     "drawHistory": "抽签历史",
     "eoiPool": "意向池",
     "insights": "智能洞察",
-    "tools": "规划工具"
+    "tools": "规划工具",
+    "laborMarket": "劳动力市场"
   },
   "draws": {
     "filters": "筛选抽签数据",
@@ -132,5 +133,22 @@
     "competitivenessScore": "分数",
     "recommendation": "建议",
     "disclaimer": "所有计算都基于历史数据和当前趋势。实际结果可能因政策变化或其他因素而有所不同。"
+  },
+  "laborMarket": {
+    "title": "劳动力市场洞察",
+    "insights": "劳动力市场洞察",
+    "occupations": "追踪职业",
+    "source": "基于Job Bank数据",
+    "trend": "趋势",
+    "impact": "影响",
+    "openings": "职位空缺",
+    "seekers": "求职者",
+    "wage": "中位数工资",
+    "relatedTo": "相关移民流",
+    "noData": "首次抓取后将提供劳动力市场数据。",
+    "dataSource": "数据来源：Job Bank Canada",
+    "error": "无法加载劳动力市场数据",
+    "about": "关于此数据",
+    "disclaimer": "劳动力市场数据来自Job Bank Canada，反映阿尔伯塔省的一般就业趋势。此数据有助于理解AAIP移民流的优先级，但不保证提名结果。"
   }
 }
