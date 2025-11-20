@@ -60,3 +60,4 @@ Thumbs.db
 
 # Screenshots and images
 images/
+*.log
