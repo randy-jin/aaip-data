@@ -45,7 +45,7 @@ jobs:
     - name: Install frontend dependencies
       run: |
         cd frontend
-        npm ci
+        npm ci --legacy-peer-deps
         
     - name: Test scraper
       env:
@@ -177,7 +177,7 @@ jobs:
           echo "📦 Installing frontend dependencies..."
           cd ../frontend
           rm -rf node_modules package-lock.json
-          npm install --prefer-offline
+          npm install --legacy-peer-deps
 
           echo "🏗️ Building frontend..."
           npm run build
