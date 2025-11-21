@@ -459,6 +459,50 @@ def check_data_changed(data):
         return True
 
 
+def check_eoi_data_changed(data):
+    """Check if EOI pool data has changed since last scrape"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Get the most recent EOI pool records
+        cursor.execute('''
+            SELECT stream_name, candidate_count
+            FROM eoi_pool
+            WHERE timestamp = (SELECT MAX(timestamp) FROM eoi_pool)
+            ORDER BY stream_name
+        ''')
+
+        last_eoi_records = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # If no previous data, it's changed
+        if not last_eoi_records:
+            return True
+
+        # Build a dict from last records for easy comparison
+        last_eoi_dict = {rec['stream_name']: rec['candidate_count'] for rec in last_eoi_records}
+        
+        # Build a dict from current data
+        current_eoi_dict = {eoi['stream_name']: eoi['candidate_count'] for eoi in data.get('eoi_pool', [])}
+
+        # Compare: check if same streams and same counts
+        if set(last_eoi_dict.keys()) != set(current_eoi_dict.keys()):
+            return True  # Different streams
+
+        for stream_name, count in current_eoi_dict.items():
+            if last_eoi_dict.get(stream_name) != count:
+                return True  # Count changed
+
+        return False  # No changes detected
+
+    except Exception as e:
+        print(f"Error checking EOI data change: {e}")
+        # If we can't check, assume it changed
+        return True
+
+
 def save_to_database(data):
     """Save scraped data to PostgreSQL database (only stream data if changed)"""
     try:
@@ -551,25 +595,32 @@ def save_to_database(data):
 
             print(f"  ✓ Processed {draws_total} draws, {draws_new} new records added")
 
-        # Always save EOI pool data (changes frequently)
+        # Save EOI pool data only if changed
         eoi_saved = 0
         eoi_total = len(data.get('eoi_pool', []))
+        eoi_changed = False
+        
         if data.get('eoi_pool'):
-            print(f"Saving {eoi_total} EOI pool records...")
-            for eoi in data['eoi_pool']:
-                cursor.execute('''
-                    INSERT INTO eoi_pool
-                    (timestamp, stream_name, candidate_count, last_updated)
-                    VALUES (%s, %s, %s, %s)
-                ''', (
-                    data['timestamp'],
-                    eoi['stream_name'],
-                    eoi['candidate_count'],
-                    data.get('last_updated')
-                ))
-                eoi_saved += 1
+            eoi_changed = check_eoi_data_changed(data)
+            
+            if eoi_changed:
+                print(f"✓ EOI pool data changes detected - saving {eoi_total} records...")
+                for eoi in data['eoi_pool']:
+                    cursor.execute('''
+                        INSERT INTO eoi_pool
+                        (timestamp, stream_name, candidate_count, last_updated)
+                        VALUES (%s, %s, %s, %s)
+                    ''', (
+                        data['timestamp'],
+                        eoi['stream_name'],
+                        eoi['candidate_count'],
+                        data.get('last_updated')
+                    ))
+                    eoi_saved += 1
 
-            print(f"  ✓ Saved {eoi_saved} EOI pool records")
+                print(f"  ✓ Saved {eoi_saved} EOI pool records")
+            else:
+                print(f"⊘ No EOI pool data changes - skipping EOI save ({eoi_total} records unchanged)")
 
         # Log the scrape
         status = 'success' if (has_changed or draws_new > 0 or eoi_saved > 0) else 'no_change'
