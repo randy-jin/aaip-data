@@ -61,3 +61,6 @@ Thumbs.db
 # Screenshots and images
 images/
 *.log
+
+# Downloaded PDFs (can be re-downloaded by scripts)
+*.pdf
