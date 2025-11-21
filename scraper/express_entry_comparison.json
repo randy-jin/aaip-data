@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-11-18T23:40:57.819381",
+  "timestamp": "2025-11-21T13:22:23.076588",
   "latest_draws": [
     {
       "draw_date": "2024-11-19",
@@ -58,9 +58,9 @@
   },
   "comparison": {
     "aaip": {
-      "avg_crs": 53.8,
+      "avg_crs": 53.3,
       "min_crs": 42,
-      "avg_invitations": 140,
+      "avg_invitations": 239,
       "draw_count": 10
     },
     "ee_pnp": {
