@@ -11,6 +11,7 @@ import LaborMarketInsights from './components/LaborMarketInsights';
 import SuccessStories from './components/SuccessStories';
 import Predictions from './pages/Predictions';
 import DisclaimerBanner from './components/DisclaimerBanner';
+import AAIPNews from './components/AAIPNews';
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -322,6 +323,16 @@ function App() {
               >
                 {t('tabs.community') || 'Success Stories'}
               </button>
+              <button
+                onClick={() => setActiveTab('news')}
+                className={`py-4 px-6 text-sm font-medium border-b-2 transition ${
+                  activeTab === 'news'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                {t('tabs.news') || 'News & Updates'}
+              </button>
             </nav>
           </div>
         </div>
@@ -474,6 +485,9 @@ function App() {
 
         {/* Success Stories Tab Content */}
         {activeTab === 'community' && <SuccessStories />}
+
+        {/* News & Updates Tab Content */}
+        {activeTab === 'news' && <AAIPNews />}
 
         <footer className="mt-12 text-center text-gray-600 text-sm border-t border-gray-200 pt-6">
           <p>{t('footer.dataSource')} <a href="https://www.alberta.ca/aaip-processing-information" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Alberta.ca AAIP Processing Information</a></p>

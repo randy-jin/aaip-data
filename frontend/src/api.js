@@ -75,4 +75,19 @@ export const getEOIAlerts = async (thresholdPercentage = 5.0) => {
   return response.data;
 };
 
+// AAIP News endpoints
+export const getAAIPNews = async (limit = 20, offset = 0) => {
+  const response = await api.get('/api/news', {
+    params: { limit, offset }
+  });
+  return response.data;
+};
+
+export const getLatestNews = async (count = 5) => {
+  const response = await api.get('/api/news/latest', {
+    params: { count }
+  });
+  return response.data;
+};
+
 export default api;

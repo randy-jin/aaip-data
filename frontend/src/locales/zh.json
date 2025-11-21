@@ -26,7 +26,8 @@
     "tools": "规划工具",
     "laborMarket": "劳动力市场",
     "predictions": "趋势预测",
-    "community": "成功案例"
+    "community": "成功案例",
+    "news": "新闻与更新"
   },
   "draws": {
     "filters": "筛选抽签数据",
@@ -150,5 +151,21 @@
     "important": "重要信息",
     "contextNote": "此劳动力市场信息提供阿尔伯塔省就业趋势的一般背景。不保证AAIP提名结果。",
     "updateSchedule": "本页面根据阿尔伯塔省经济报告和政府出版物每季度手动更新。获取最准确的AAIP信息，请参阅官方"
+  },
+  "news": {
+    "title": "AAIP 新闻与更新",
+    "subtitle": "阿尔伯塔省优势移民计划的最新官方更新",
+    "totalArticles": "文章总数",
+    "autoTranslated": "自动翻译为中文",
+    "noNews": "目前没有可用的新闻文章。",
+    "translated": "已翻译",
+    "original": "原文",
+    "viewOfficial": "查看官方来源",
+    "disclaimer": "免责声明",
+    "disclaimerText": "新闻文章自动收集并翻译。如需最准确和官方的信息，请始终参考阿尔伯塔省政府官方网站。"
+  },
+  "pagination": {
+    "previous": "上一页",
+    "next": "下一页"
   }
 }

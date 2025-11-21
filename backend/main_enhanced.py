@@ -2297,12 +2297,123 @@ async def get_draw_prediction():
             "predictions": predictions,
             "important_notice": "These are statistical estimates based on past patterns, not official predictions. AAIP draw schedules can change based on government priorities and policy updates."
         }
-        
+
     except Exception as e:
         return {
             "error": str(e),
             "predictions": []
         }
+
+
+# ==============================================
+# AAIP NEWS ENDPOINTS
+# ==============================================
+
+class AAIPNews(BaseModel):
+    id: int
+    title_en: str
+    title_zh: str
+    content_en: str
+    content_zh: str
+    published_date: str
+    source_url: str
+    scraped_at: str
+    updated_at: str
+
+
+@app.get("/api/news")
+async def get_aaip_news(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    lang: Optional[str] = Query(None, regex="^(en|zh)$")
+):
+    """
+    Get AAIP news/updates from official government website
+    Returns news in both English and Chinese
+
+    Parameters:
+    - limit: Maximum number of articles to return (default: 20, max: 100)
+    - offset: Number of articles to skip (for pagination)
+    - lang: Optional language filter ('en' or 'zh') - doesn't filter, just for client reference
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Get news articles
+        query = """
+            SELECT
+                id, title_en, title_zh, content_en, content_zh,
+                published_date, source_url, scraped_at, updated_at
+            FROM aaip_news
+            ORDER BY published_date DESC
+            LIMIT %s OFFSET %s
+        """
+
+        cursor.execute(query, (limit, offset))
+        news = cursor.fetchall()
+
+        # Get total count
+        cursor.execute("SELECT COUNT(*) as total FROM aaip_news")
+        total = cursor.fetchone()['total']
+
+        cursor.close()
+        conn.close()
+
+        # Convert dates to strings for JSON serialization
+        for article in news:
+            article['published_date'] = article['published_date'].isoformat() if article['published_date'] else None
+            article['scraped_at'] = article['scraped_at'].isoformat() if article['scraped_at'] else None
+            article['updated_at'] = article['updated_at'].isoformat() if article['updated_at'] else None
+
+        return {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "news": news
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database connection failed: {str(e)}"
+        )
+
+
+@app.get("/api/news/latest")
+async def get_latest_news(count: int = Query(5, ge=1, le=20)):
+    """Get the most recent AAIP news articles"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        query = """
+            SELECT
+                id, title_en, title_zh, content_en, content_zh,
+                published_date, source_url, scraped_at
+            FROM aaip_news
+            ORDER BY published_date DESC
+            LIMIT %s
+        """
+
+        cursor.execute(query, (count,))
+        news = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        # Convert dates to strings
+        for article in news:
+            article['published_date'] = article['published_date'].isoformat() if article['published_date'] else None
+            article['scraped_at'] = article['scraped_at'].isoformat() if article['scraped_at'] else None
+
+        return news
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database connection failed: {str(e)}"
+        )
 
 
 # ==============================================

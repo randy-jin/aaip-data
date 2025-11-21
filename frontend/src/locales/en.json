@@ -26,7 +26,8 @@
     "tools": "Planning Tools",
     "laborMarket": "Labor Market",
     "predictions": "Trend Predictions",
-    "community": "Success Stories"
+    "community": "Success Stories",
+    "news": "News & Updates"
   },
   "draws": {
     "filters": "Filter Draw Data",
@@ -150,5 +151,21 @@
     "important": "Important Information",
     "contextNote": "This labor market information provides general context about employment trends in Alberta. It does NOT guarantee AAIP nomination outcomes.",
     "updateSchedule": "This page is manually updated quarterly based on Alberta economic reports and government publications. For the most accurate AAIP information, refer to the official"
+  },
+  "news": {
+    "title": "AAIP News & Updates",
+    "subtitle": "Latest official updates from Alberta Advantage Immigration Program",
+    "totalArticles": "Total Articles",
+    "autoTranslated": "Auto-translated to Chinese",
+    "noNews": "No news articles available at this time.",
+    "translated": "Translated",
+    "original": "Original",
+    "viewOfficial": "View Official Source",
+    "disclaimer": "Disclaimer",
+    "disclaimerText": "News articles are automatically collected and translated. For the most accurate and official information, always refer to the official Alberta government website."
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next"
   }
 }
