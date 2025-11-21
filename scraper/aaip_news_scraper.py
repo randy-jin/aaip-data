@@ -122,8 +122,8 @@ def scrape_aaip_news():
 
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # Find all h3 headings (news titles)
-        headings = soup.find_all('h3')
+        # Find all h3 headings with class "goa-title" (news titles)
+        headings = soup.find_all('h3', class_='goa-title')
 
         news_articles = []
 
@@ -137,21 +137,22 @@ def scrape_aaip_news():
                 print(f"Skipping heading without date: {heading_text}")
                 continue
 
-            # Extract content (paragraphs following this heading until next h3)
+            # Extract content - look for next div with class "goa-text"
+            content_div = heading.find_next_sibling('div', class_='goa-text')
             content_parts = []
-            for sibling in heading.find_next_siblings():
-                if sibling.name == 'h3':
-                    break  # Stop at next heading
 
-                if sibling.name == 'p':
-                    # Get text, remove extra whitespace
-                    text = sibling.get_text(strip=True)
+            if content_div:
+                # Get all paragraphs from this div
+                paragraphs = content_div.find_all('p')
+                for p in paragraphs:
+                    text = p.get_text(strip=True)
                     if text:
                         content_parts.append(text)
 
-                # Also check for lists
-                if sibling.name in ['ul', 'ol']:
-                    list_items = sibling.find_all('li')
+                # Also get list items
+                lists = content_div.find_all(['ul', 'ol'])
+                for ul in lists:
+                    list_items = ul.find_all('li')
                     for li in list_items:
                         text = li.get_text(strip=True)
                         if text:
@@ -248,13 +249,10 @@ def log_scrape_activity(status, message):
         conn = get_db_connection()
         cur = conn.cursor()
 
-        query = """
-            INSERT INTO scrape_log (source, status, message, timestamp)
-            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
-        """
-        cur.execute(query, ('aaip_news', status, message))
+        # Simple log - just print, don't save to DB for now
+        # (scrape_log table structure may vary)
+        print(f"Log: {status} - {message}")
 
-        conn.commit()
         cur.close()
         conn.close()
     except Exception as e:
