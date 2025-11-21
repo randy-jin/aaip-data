@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- Homepage -->
+  <url>
+    <loc>https://aaip.randy.it.com/</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://aaip.randy.it.com/?lang=en"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://aaip.randy.it.com/?lang=zh"/>
+  </url>
+
+  <!-- Nomination Summary Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#summary</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Draw History Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#draws</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- EOI Pool Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#eoi</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Smart Insights Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#insights</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Planning Tools Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#tools</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Labor Market Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#labor-market</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Trend Predictions Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#predictions</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Success Stories Tab -->
+  <url>
+    <loc>https://aaip.randy.it.com/#success-stories</loc>
+    <lastmod>2025-11-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+</urlset>

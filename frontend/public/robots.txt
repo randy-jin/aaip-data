@@ -1,0 +1,12 @@
+# Allow all search engines to crawl the site
+User-agent: *
+Allow: /
+
+# Disallow sensitive or admin paths (if any in the future)
+# Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://aaip.randy.it.com/sitemap.xml
+
+# Crawl-delay (optional, helps prevent server overload)
+Crawl-delay: 1
