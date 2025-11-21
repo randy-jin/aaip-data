@@ -423,3 +423,55 @@ psql -d aaip_data_trend_dev_db -c "SELECT recorded_date, indicator_name, value F
 ```
 
 **See `scraper/AUTOMATION_SETUP.md`, `scraper/AUTOMATION_SUMMARY.md`, and `scraper/EXTENDED_COLLECTORS_README.md` for complete documentation.**
+
+## SEO Configuration
+
+### Current Status ✅
+The application has comprehensive SEO optimization implemented:
+- Meta tags (title, description, keywords, Open Graph, Twitter Cards)
+- Structured data (JSON-LD schemas)
+- Sitemap.xml and robots.txt
+- PWA manifest
+- Multi-language support (en/zh)
+- Google Search Console verification
+
+### Missing Assets ⚠️
+Create these image assets before deploying major updates:
+- `/frontend/public/og-image.png` (1200x630px) - Social media sharing
+- `/frontend/public/twitter-card.png` (1200x600px) - Twitter preview
+- `/frontend/public/icon-192.png` (192x192px) - PWA icon
+- `/frontend/public/icon-512.png` (512x512px) - PWA icon high-res
+- `/frontend/public/logo.png` (600x60px) - Structured data logo
+
+### SEO Health Check
+Run before deployment:
+```bash
+./scripts/check_seo_health.sh
+```
+
+### Key SEO Files
+- **Configuration**: `frontend/index.html` (all meta tags)
+- **Sitemap**: `frontend/public/sitemap.xml` (update lastmod dates when content changes)
+- **Robots**: `frontend/public/robots.txt`
+- **Manifest**: `frontend/public/manifest.json`
+- **Documentation**: `docs/SEO_SUBMISSION_GUIDE.md`, `SEO_ACTION_PLAN.md`, `SEO.md`
+
+### Performance Targets
+- Lighthouse Score: 90+ (mobile & desktop)
+- LCP (Largest Contentful Paint): < 2.5s
+- FID (First Input Delay): < 100ms
+- CLS (Cumulative Layout Shift): < 0.1
+
+### Monitoring
+- **Weekly**: Check Google Search Console for errors and traffic
+- **Monthly**: Run PageSpeed Insights, check Core Web Vitals
+- **Quarterly**: Full SEO audit, competitor analysis
+- **Tools**: Google Search Console (verified), PageSpeed Insights, Schema Validator
+
+### Best Practices When Adding New Features
+1. Update sitemap.xml with new pages/sections
+2. Add proper meta descriptions for new content
+3. Use semantic HTML (h1, h2, article, section)
+4. Add alt text to all images
+5. Keep page load fast (lazy load heavy components)
+6. Test social sharing cards after major updates
