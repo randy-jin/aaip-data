@@ -106,6 +106,13 @@
     "errorLoadingData": "加载数据出错",
     "retry": "重试"
   },
+  "disclaimer": {
+    "title": "重要免责声明",
+    "main": "本网站为非官方数据分析工具，仅供历史趋势参考，不代表政府立场或官方信息。",
+    "dataSource": "所有数据均来自公开渠道，可能无法实时反映最新变化。",
+    "predictions": "预测和洞察基于统计分析，不应作为移民决策的唯一依据。",
+    "officialSource": "请始终参考阿尔伯塔省政府官方移民网站获取权威信息："
+  },
   "smartInsights": {
     "title": "智能洞察",
     "updated": "自动更新",

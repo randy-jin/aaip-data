@@ -106,6 +106,13 @@
     "errorLoadingData": "Error Loading Data",
     "retry": "Retry"
   },
+  "disclaimer": {
+    "title": "IMPORTANT DISCLAIMER",
+    "main": "This site is an UNOFFICIAL data analysis tool, provided for historical trend reference only, and does NOT represent the government's position or official information.",
+    "dataSource": "All data is collected from publicly available sources and may not reflect real-time updates.",
+    "predictions": "Predictions and insights are based on statistical analysis and should not be used as the sole basis for immigration decisions.",
+    "officialSource": "Always refer to official Alberta government immigration website for authoritative information:"
+  },
   "smartInsights": {
     "title": "Smart Insights",
     "updated": "Auto-updated",

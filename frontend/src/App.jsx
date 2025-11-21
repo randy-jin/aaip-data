@@ -10,6 +10,7 @@ import ToolsDashboard from './components/ToolsDashboard';
 import LaborMarketInsights from './components/LaborMarketInsights';
 import SuccessStories from './components/SuccessStories';
 import Predictions from './pages/Predictions';
+import DisclaimerBanner from './components/DisclaimerBanner';
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -195,6 +196,9 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* Disclaimer Banner */}
+      <DisclaimerBanner />
 
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {stats && stats.latest_data && (
