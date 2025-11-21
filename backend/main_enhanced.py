@@ -93,6 +93,7 @@ class DrawRecord(BaseModel):
     stream_detail: Optional[str]
     min_score: Optional[int]
     invitations_issued: Optional[int]
+    selection_parameters: Optional[str]
     created_at: str
     updated_at: str
 
@@ -496,7 +497,8 @@ def get_draws(
     stream_category: Optional[str] = None,
     stream_detail: Optional[str] = None,
     start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
+    year: Optional[int] = None
 ):
     """
     Get draw records with optional filtering
@@ -507,6 +509,7 @@ def get_draws(
     - **stream_detail**: Filter by stream detail/pathway
     - **start_date**: Filter draws on or after this date (YYYY-MM-DD)
     - **end_date**: Filter draws on or before this date (YYYY-MM-DD)
+    - **year**: Filter draws by year (e.g., 2024, 2025)
     """
     try:
         conn = get_db_connection()
@@ -514,7 +517,8 @@ def get_draws(
 
         query = """
             SELECT id, draw_date, draw_number, stream_category, stream_detail,
-                   min_score, invitations_issued, created_at, updated_at
+                   min_score, invitations_issued, selection_parameters,
+                   created_at, updated_at
             FROM aaip_draws
             WHERE 1=1
         """
@@ -525,12 +529,16 @@ def get_draws(
             params.append(stream_category)
 
         if stream_detail:
-            # Handle "General" as NULL stream_detail
+            # "General" is displayed in frontend but stored as NULL in DB
             if stream_detail == "General":
-                query += " AND stream_detail IS NULL"
+                query += " AND (stream_detail IS NULL OR stream_detail = '')"
             else:
                 query += " AND stream_detail = %s"
                 params.append(stream_detail)
+        
+        if year:
+            query += " AND EXTRACT(YEAR FROM draw_date) = %s"
+            params.append(year)
 
         if start_date:
             query += " AND draw_date >= %s"
@@ -557,6 +565,7 @@ def get_draws(
                 stream_detail=row['stream_detail'],
                 min_score=row['min_score'],
                 invitations_issued=row['invitations_issued'],
+                selection_parameters=row['selection_parameters'],
                 created_at=row['created_at'].isoformat(),
                 updated_at=row['updated_at'].isoformat()
             )
@@ -584,14 +593,18 @@ def get_draw_streams():
 
         # Get category-detail combinations
         cursor.execute("""
-            SELECT DISTINCT stream_category, stream_detail
+            SELECT DISTINCT stream_category, 
+                   CASE 
+                       WHEN stream_detail IS NULL OR stream_detail = '' THEN 'General'
+                       ELSE stream_detail
+                   END as stream_detail
             FROM aaip_draws
             ORDER BY stream_category, stream_detail
         """)
         streams = [
             {
                 'category': row['stream_category'],
-                'detail': row['stream_detail'] or 'General'
+                'detail': row['stream_detail']
             }
             for row in cursor.fetchall()
         ]
@@ -637,9 +650,9 @@ def get_draw_trends(
             params.append(stream_category)
 
         if stream_detail:
-            # Handle "General" as NULL stream_detail
+            # "General" is displayed in frontend but stored as NULL in DB
             if stream_detail == "General":
-                query += " AND stream_detail IS NULL"
+                query += " AND (stream_detail IS NULL OR stream_detail = '')"
             else:
                 query += " AND stream_detail = %s"
                 params.append(stream_detail)
@@ -672,8 +685,17 @@ def get_draw_trends(
 
 
 @app.get("/api/draws/stats", response_model=List[DrawStats])
-def get_draw_stats(stream_category: Optional[str] = None):
-    """Get aggregated statistics for each stream"""
+def get_draw_stats(
+    stream_category: Optional[str] = None, 
+    stream_detail: Optional[str] = None,
+    year: Optional[int] = None
+):
+    """Get aggregated statistics for each stream
+    
+    - **stream_category**: Filter by stream category
+    - **stream_detail**: Filter by stream detail
+    - **year**: Filter by year (e.g., 2025, 2024)
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -690,12 +712,25 @@ def get_draw_stats(stream_category: Optional[str] = None):
                 MAX(draw_date) as latest_draw_date,
                 MIN(draw_date) as earliest_draw_date
             FROM aaip_draws
+            WHERE 1=1
         """
         params = []
 
         if stream_category:
-            query += " WHERE stream_category = %s"
+            query += " AND stream_category = %s"
             params.append(stream_category)
+
+        if stream_detail:
+            # "General" is displayed in frontend but stored as NULL in DB
+            if stream_detail == "General":
+                query += " AND (stream_detail IS NULL OR stream_detail = '')"
+            else:
+                query += " AND stream_detail = %s"
+                params.append(stream_detail)
+
+        if year:
+            query += " AND EXTRACT(YEAR FROM draw_date) = %s"
+            params.append(year)
 
         query += """
             GROUP BY stream_category, stream_detail

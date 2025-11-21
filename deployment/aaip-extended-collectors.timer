@@ -1,0 +1,12 @@
+[Unit]
+Description=Run AAIP Extended Data Collectors Daily
+Requires=aaip-extended-collectors.service
+
+[Timer]
+# Run daily at 3:00 AM (less frequent than main scraper)
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

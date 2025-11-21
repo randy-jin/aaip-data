@@ -45,14 +45,24 @@ python run_migrations.py
 cd scraper
 pip install -r requirements.txt
 
-# Main scraper (processing info + draw records)
-python scraper.py
+# AUTOMATED COLLECTION (Recommended)
+# Run all collectors in sequence with orchestrator
+python3 collect_all_data.py
 
-# Additional data collectors
-python express_entry_collector.py      # Federal EE draw data
-python alberta_economy_collector.py    # Economic indicators
-python quarterly_labor_market_collector.py  # Labor market data
-python job_bank_scraper.py            # Job Bank data
+# Or use the setup script for automation
+./setup_automation.sh
+
+# MANUAL COLLECTION (Individual Scripts)
+python scraper.py                              # Main AAIP processing info + draw records
+python aaip_news_scraper.py                    # News updates from /aaip-updates
+python express_entry_collector.py              # Federal EE draw data
+python alberta_economy_collector.py            # Economic indicators
+python quarterly_labor_market_collector.py     # Labor market data
+python job_bank_scraper.py                     # Job Bank data
+python trend_analysis_engine.py                # Trend analysis
+
+# Testing
+python test_collectors.py                      # Test all collectors can import
 
 # Seed sample data
 python seed_success_stories.py
@@ -79,12 +89,16 @@ npm preview
 ### Three-Tier System
 
 1. **Data Collection Layer** (`scraper/`)
+   - `collect_all_data.py`: **Orchestrator script** - runs all collectors hourly (automated)
    - `scraper.py`: Main scraper for AAIP processing info and draw records
+   - `aaip_news_scraper.py`: News updates from https://www.alberta.ca/aaip-updates
    - `express_entry_collector.py`: Federal Express Entry comparison data
    - `alberta_economy_collector.py`: Provincial economic indicators
    - `quarterly_labor_market_collector.py`: Labor market statistics
    - `job_bank_scraper.py`: Job posting trends
    - `trend_analysis_engine.py`: Historical pattern analysis engine
+   - `setup_automation.sh`: Helper script to set up automated collection
+   - `test_collectors.py`: Test suite for all collectors
 
 2. **API Layer** (`backend/`)
    - `main_draws.py`: Current production backend (v2.0.0) with full draw support
@@ -312,3 +326,100 @@ The project uses minimal automated testing:
 - No unit test framework (Jest, pytest) configured
 
 Manual testing is the primary validation method before merging to test branch.
+
+## Automated Data Collection
+
+### Overview
+
+The system has **two automated data collection pipelines**:
+
+#### 1. Main Pipeline (Hourly)
+Collects **critical, time-sensitive data** every hour:
+- ✅ **AAIP Processing Info & Draw Records** - https://www.alberta.ca/aaip-processing-information
+- ✅ **AAIP News Updates** - https://www.alberta.ca/aaip-updates (with Chinese translation)
+- ✅ **Trend Analysis Engine** - Historical pattern analysis
+
+**Orchestrator**: `scraper/collect_all_data.py`
+**Timer**: `aaip-scraper.timer` (runs at :00 minutes every hour)
+
+#### 2. Extended Pipeline (Daily)
+Collects **supplementary data** once per day at 3:00 AM:
+- ✅ **Express Entry Comparison** - Federal EE draw data (updates every 2 weeks, check daily)
+- ✅ **Alberta Economy Indicators** - Provincial economic data
+- ✅ **Labor Market Data** - Employment and wage statistics (quarterly)
+- ✅ **Job Bank Postings** - Job market trends
+
+**Orchestrator**: `scraper/collect_extended_data.py`
+**Timer**: `aaip-extended-collectors.timer` (runs daily at 3:00 AM)
+
+### Quick Setup - Local Testing
+
+```bash
+# Test main pipeline
+cd scraper
+python3 collect_all_data.py --verbose
+
+# Test extended pipeline
+python3 collect_extended_data.py --verbose
+
+# Test specific extended collector
+python3 collect_extended_data.py --collector express_entry -v
+```
+
+### Production Deployment
+
+#### Main Pipeline Setup
+```bash
+# Already deployed - check status
+sudo systemctl status aaip-scraper.timer
+sudo systemctl list-timers | grep aaip
+sudo journalctl -u aaip-scraper.service -f
+```
+
+#### Extended Pipeline Setup
+```bash
+# Deploy new timer
+cd /home/randy/deploy/aaip-data
+git pull origin test
+
+sudo cp deployment/aaip-extended-collectors.service /etc/systemd/system/
+sudo cp deployment/aaip-extended-collectors.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+
+# Enable and start
+sudo systemctl enable aaip-extended-collectors.timer
+sudo systemctl start aaip-extended-collectors.timer
+
+# Verify
+sudo systemctl status aaip-extended-collectors.timer
+sudo systemctl list-timers | grep extended
+
+# Manual trigger
+sudo systemctl start aaip-extended-collectors.service
+sudo journalctl -u aaip-extended-collectors.service -f
+```
+
+### Monitoring Data Collection
+
+```bash
+# Main pipeline logs
+sudo journalctl -u aaip-scraper.service --since today
+
+# Extended pipeline logs
+sudo journalctl -u aaip-extended-collectors.service --since today
+
+# Check scrape history
+psql -d aaip_data_trend_dev_db -c "SELECT * FROM scrape_log ORDER BY timestamp DESC LIMIT 10;"
+
+# Check draw data
+psql -d aaip_data_trend_dev_db -c "SELECT draw_date, stream_category, lowest_score FROM aaip_draws ORDER BY draw_date DESC LIMIT 10;"
+
+# Check news
+psql -d aaip_data_trend_dev_db -c "SELECT published_date, title_en FROM aaip_news ORDER BY published_date DESC LIMIT 10;"
+
+# Check extended data
+psql -d aaip_data_trend_dev_db -c "SELECT draw_date, crs_cutoff FROM express_entry_draws ORDER BY draw_date DESC LIMIT 5;"
+psql -d aaip_data_trend_dev_db -c "SELECT recorded_date, indicator_name, value FROM alberta_economy ORDER BY recorded_date DESC LIMIT 5;"
+```
+
+**See `scraper/AUTOMATION_SETUP.md`, `scraper/AUTOMATION_SUMMARY.md`, and `scraper/EXTENDED_COLLECTORS_README.md` for complete documentation.**

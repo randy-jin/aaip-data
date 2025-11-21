@@ -58,9 +58,18 @@ Thumbs.db
 *.old
 .gemini-clipboard/
 
-# Screenshots and images
+# Screenshots and images (keep screenshots/ for reference)
 images/
 *.log
 
 # Downloaded PDFs (can be re-downloaded by scripts)
 *.pdf
+
+# Test and temporary scripts
+backend/test_*.py
+backend/check_*.py
+scraper/test_*.py
+scraper/analyze_*.py
+scraper/fix_*.py
+scraper/*_manual.py
+scraper/safe_*.py

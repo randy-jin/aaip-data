@@ -344,6 +344,11 @@ def scrape_aaip_data():
                     stream_text = cells[1].get_text(strip=True)
                     min_score_str = cells[2].get_text(strip=True)
                     invitations_str = cells[3].get_text(strip=True)
+                    
+                    # Extract selection parameters if available (5th column)
+                    selection_params = None
+                    if len(cells) >= 5:
+                        selection_params = cells[4].get_text(strip=True) or None
 
                     # Parse values
                     draw_date = parse_date(draw_date_str)
@@ -362,6 +367,7 @@ def scrape_aaip_data():
                         'stream_detail': stream_detail,
                         'min_score': min_score,
                         'invitations_issued': invitations,
+                        'selection_parameters': selection_params,
                     })
 
                 print(f"  ✓ {len(all_data['draws'])} draw records collected")
@@ -521,12 +527,13 @@ def save_to_database(data):
                 # The index uses COALESCE(stream_detail, '') so we need to handle NULL
                 cursor.execute('''
                     INSERT INTO aaip_draws
-                    (draw_date, stream_category, stream_detail, min_score, invitations_issued)
-                    VALUES (%s, %s, %s, %s, %s)
+                    (draw_date, stream_category, stream_detail, min_score, invitations_issued, selection_parameters)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT (draw_date, stream_category, COALESCE(stream_detail, ''))
                     DO UPDATE SET
                         min_score = EXCLUDED.min_score,
                         invitations_issued = EXCLUDED.invitations_issued,
+                        selection_parameters = EXCLUDED.selection_parameters,
                         updated_at = CURRENT_TIMESTAMP
                     RETURNING (xmax = 0) AS inserted
                 ''', (
@@ -534,7 +541,8 @@ def save_to_database(data):
                     draw['stream_category'],
                     draw['stream_detail'],
                     draw['min_score'],
-                    draw['invitations_issued']
+                    draw['invitations_issued'],
+                    draw['selection_parameters']
                 ))
 
                 result = cursor.fetchone()

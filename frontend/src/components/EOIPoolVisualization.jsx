@@ -15,20 +15,28 @@ function EOIPoolVisualization() {
   const [selectedStream, setSelectedStream] = useState(null);
   const [trendDays, setTrendDays] = useState(7);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    const loadInitialData = async () => {
+      setLoading(true);
+      await fetchData();
+      await fetchTrends();
+      setInitialLoad(false);
+      setLoading(false);
+    };
+    loadInitialData();
   }, []);
 
   useEffect(() => {
-    if (selectedStream || trendDays) {
+    // Only refetch trends when filters change after initial load
+    if (!initialLoad) {
       fetchTrends();
     }
   }, [selectedStream, trendDays]);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       const [poolData, alertData] = await Promise.all([
         getLatestEOIPool(),
         getEOIAlerts(5.0)
@@ -36,12 +44,8 @@ function EOIPoolVisualization() {
 
       setLatestPool(poolData);
       setAlerts(alertData);
-
-      await fetchTrends();
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching EOI data:', error);
-      setLoading(false);
     }
   };
 
@@ -54,8 +58,11 @@ function EOIPoolVisualization() {
     }
   };
 
-  const handleRefresh = () => {
-    fetchData();
+  const handleRefresh = async () => {
+    setLoading(true);
+    await fetchData();
+    await fetchTrends();
+    setLoading(false);
   };
 
   // Process trend data for charts

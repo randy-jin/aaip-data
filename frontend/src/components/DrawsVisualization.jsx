@@ -88,7 +88,7 @@ export default function DrawsVisualization() {
 
       const [trends, stats, recent] = await Promise.all([
         getDrawTrends(params),
-        getDrawStats(selectedCategory !== 'all' ? selectedCategory : null),
+        getDrawStats(params),
         getDrawRecords({ ...params, limit: 20 })
       ]);
 
@@ -111,9 +111,11 @@ export default function DrawsVisualization() {
 
   const getAvailableDetails = () => {
     if (selectedCategory === 'all') return [];
-    return streams.streams
+    const details = streams.streams
       .filter(s => s.category === selectedCategory)
       .map(s => s.detail);
+    // Remove duplicates
+    return [...new Set(details)];
   };
 
   const getAvailableYears = () => {
@@ -209,8 +211,8 @@ export default function DrawsVisualization() {
               disabled={selectedCategory === 'all'}
             >
               <option value="all">All Pathways</option>
-              {getAvailableDetails().map(detail => (
-                <option key={detail} value={detail}>{detail}</option>
+              {getAvailableDetails().map((detail, index) => (
+                <option key={`${selectedCategory}-${detail}-${index}`} value={detail}>{detail}</option>
               ))}
             </select>
           </div>
@@ -394,6 +396,7 @@ export default function DrawsVisualization() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Detail</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Min Score</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Invitations</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Selection Parameters</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -409,6 +412,11 @@ export default function DrawsVisualization() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-green-600">
                       {draw.invitations_issued?.toLocaleString() || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-md">
+                      <div className="line-clamp-2" title={draw.selection_parameters || '-'}>
+                        {draw.selection_parameters || '-'}
+                      </div>
                     </td>
                   </tr>
                 ))}

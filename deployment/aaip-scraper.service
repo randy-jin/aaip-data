@@ -1,5 +1,5 @@
 [Unit]
-Description=AAIP Data Scraper - Hourly scraping job
+Description=AAIP Data Collection Orchestrator - Hourly data collection job
 After=network.target postgresql.service
 
 [Service]
@@ -14,8 +14,11 @@ Environment="PATH=/home/randy/deploy/aaip-data/scraper/venv/bin"
 # Database connection (update if needed)
 Environment="DATABASE_URL=dbname=aaip_data_trend_dev_db"
 
-# Run the scraper (consolidated version with both nomination and draw data collection)
-ExecStart=/home/randy/deploy/aaip-data/scraper/venv/bin/python3 scraper.py
+# Run the orchestrator (runs all data collection scripts)
+ExecStart=/home/randy/deploy/aaip-data/scraper/venv/bin/python3 collect_all_data.py
+
+# Timeout for all collectors (15 minutes)
+TimeoutStartSec=900
 
 # Logging
 StandardOutput=journal
