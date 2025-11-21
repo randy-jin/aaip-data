@@ -238,7 +238,10 @@ VITE_API_BASE_URL=http://localhost:8000
 **Server Requirements:**
 - Cloudflare Tunnel configured for SSH
 - Deploy user with sudo permissions (configured in `/etc/sudoers.d/aaip-deploy`)
-- Systemd services: `aaip-backend-test`, `aaip-scraper.service`, `aaip-scraper.timer`
+- Systemd services: 
+  - `aaip-backend-test` - FastAPI backend service
+  - `aaip-scraper.service` + `aaip-scraper.timer` - Hourly data collection
+  - `aaip-extended-collectors.service` + `aaip-extended-collectors.timer` - Daily extended data collection
 
 ## Common Workflows
 
@@ -261,15 +264,42 @@ git push origin test  # Triggers automatic deployment
 ./deployment/update.sh
 ```
 
-### Running Scraper Manually
+### Data Collection Services
+
+We have **2 automated data collectors** running via systemd timers:
+
+1. **Main Collector (Hourly)** - `aaip-scraper.service`
+   - Runs: AAIP processing info, draw history, EOI pool, news updates
+   - Schedule: Every hour
+   - Script: `collect_all_data.py`
+
+2. **Extended Collector (Daily)** - `aaip-extended-collectors.service`
+   - Runs: Express Entry, economy, labor market, Job Bank data
+   - Schedule: Daily at 3:00 AM
+   - Script: `collect_extended_data.py`
 
 ```bash
-# On server
-sudo systemctl start aaip-scraper.service
+# Setup all collectors (one-time)
+cd /home/randy/deploy/aaip-data
+./deployment/setup_collectors.sh
 
-# Check logs
+# Check timer status
+sudo systemctl list-timers | grep aaip
+
+# Manually trigger collection
+sudo systemctl start aaip-scraper.service          # Hourly data
+sudo systemctl start aaip-extended-collectors.service  # Daily data
+
+# View logs
 sudo journalctl -u aaip-scraper.service -f
+sudo journalctl -u aaip-extended-collectors.service -f
+
+# Restart timers after code updates
+sudo systemctl restart aaip-scraper.timer
+sudo systemctl restart aaip-extended-collectors.timer
 ```
+
+See `deployment/DATA_COLLECTORS_SETUP.md` for complete documentation.
 
 ### Checking Service Status
 
@@ -278,9 +308,10 @@ sudo journalctl -u aaip-scraper.service -f
 sudo systemctl status aaip-backend-test
 sudo journalctl -u aaip-backend-test -f
 
-# Scraper timer status
+# Data collector status
 sudo systemctl status aaip-scraper.timer
-sudo systemctl list-timers aaip-scraper.timer
+sudo systemctl status aaip-extended-collectors.timer
+sudo systemctl list-timers | grep aaip
 ```
 
 ### Database Operations
